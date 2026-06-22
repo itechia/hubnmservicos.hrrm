@@ -5,6 +5,7 @@ import PDFDocument from 'pdfkit';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,19 +51,48 @@ const LIMITS = {
   umid: { min: +env.UMID_MIN || 40, max: +env.UMID_MAX || 70, target: +env.UMID_TARGET || 55 },
 };
 
-// ── Sessions (in-memory for MVP) ────────────────────────────────
-const sessions = new Map();
-function generateToken() {
-  return Array.from({ length: 48 }, () => Math.random().toString(36)[2]).join('');
+// ── Stateless Token Authentication (JWT-like using native crypto) ──
+const JWT_SECRET = env.JWT_SECRET || 'default_secret_for_hrrm_dashboards_2026';
+
+function generateToken(user) {
+  const payload = JSON.stringify({
+    login: user.login,
+    permissao: user.permissao,
+    exp: Date.now() + 8 * 60 * 60 * 1000 // 8 hours expiration
+  });
+  const payloadB64 = Buffer.from(payload).toString('base64url');
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(payloadB64).digest('base64url');
+  return `${payloadB64}.${signature}`;
+}
+
+function verifyToken(token) {
+  try {
+    const [payloadB64, signature] = token.split('.');
+    if (!payloadB64 || !signature) return null;
+    
+    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(payloadB64).digest('base64url');
+    if (signature !== expectedSignature) return null;
+    
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+    if (payload.exp < Date.now()) return null; // Expired
+    
+    return { login: payload.login, permissao: payload.permissao };
+  } catch (err) {
+    return null;
+  }
 }
 
 // ── Auth middleware ─────────────────────────────────────────────
 function requireAuth(req, res, next) {
   const token = req.headers['authorization']?.replace('Bearer ', '');
-  if (!token || !sessions.has(token)) {
+  if (!token) {
     return res.status(401).json({ error: 'Não autorizado. Faça login.' });
   }
-  req.user = sessions.get(token);
+  const user = verifyToken(token);
+  if (!user) {
+    return res.status(401).json({ error: 'Sessão expirada ou inválida. Faça login novamente.' });
+  }
+  req.user = user;
   next();
 }
 
@@ -127,11 +157,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
-    const token = generateToken();
-    sessions.set(token, foundUser);
-
-    // Auto-expire session after 8 hours
-    setTimeout(() => sessions.delete(token), 8 * 60 * 60 * 1000);
+    const token = generateToken(foundUser);
 
     res.json({ token, user: foundUser });
   } catch (err) {
@@ -141,8 +167,6 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-  const token = req.headers['authorization']?.replace('Bearer ', '');
-  if (token) sessions.delete(token);
   res.json({ ok: true });
 });
 
