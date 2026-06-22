@@ -1,0 +1,16 @@
+{
+  "name": "hrrm-monitoring-hub",
+  "version": "1.0.0",
+  "description": "Hub de Monitoramento Hospitalar HRRM - Central de Controle",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "mysql2": "^3.11.0",
+    "pdfkit": "^0.15.0"
+  }
+}

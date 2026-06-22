@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Hub de Monitoramento Hospitalar HRRM - Controle de Temperatura e Umidade em tempo real">
+  <title>HRRM | Central de Monitoramento</title>
+
+  <!-- Google Fonts: Brand NM Serviços -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <!-- PDF-Lib for Client-Side PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+  <!-- CSS with cache buster -->
+  <link rel="stylesheet" href="/css/variables.css?v=13">
+  <link rel="stylesheet" href="/css/login.css?v=13">
+  <link rel="stylesheet" href="/css/style.css?v=13">
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- LOGIN SCREEN                            -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-particles"></div>
+    <div class="login-card" id="login-card">
+      <div class="login-logo" style="text-align: center;">
+        <img src="/logo.png" alt="NM Serviços Logo" style="max-height: 90px; width: auto; margin-bottom: var(--space-md); filter: drop-shadow(0 4px 8px rgba(11,35,92,0.1));">
+        <h1 style="font-family: var(--font-headline); font-size: var(--fs-xl); margin: 0 0 var(--space-2xs);">NM Serviços</h1>
+        <p class="login-subtitle">Central de Monitoramento Hospitalar</p>
+      </div>
+
+      <form id="login-form" autocomplete="off">
+        <div class="input-group" id="input-group-login">
+          <label for="login-input">Usuário</label>
+          <input type="text" id="login-input" name="login" placeholder="Digite seu login" required>
+          <span class="input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </span>
+        </div>
+        <div class="input-group" id="input-group-senha">
+          <label for="senha-input">Senha</label>
+          <input type="password" id="senha-input" name="senha" placeholder="Digite sua senha" required>
+          <span class="input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </span>
+        </div>
+        <div id="login-error" class="login-error" style="display:none;"></div>
+        <button type="submit" id="login-btn" class="login-btn">
+          <span class="btn-text">Entrar</span>
+          <span class="btn-loader" style="display:none;"></span>
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <span>Confiável</span> · <span>Técnica</span> · <span>Eficiente</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- DASHBOARD (hidden until login)          -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="app" class="app" style="display:none;">
+
+    <!-- Top Header -->
+    <header class="top-header" id="top-header">
+      <div class="header-left">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="header-brand">
+          <img src="/logo.png" alt="NM Serviços Logo" style="height: 32px; width: auto;" class="header-logo-img">
+          <div>
+            <span class="brand-name">NM Serviços</span>
+            <span class="brand-module">Controle de Temperatura</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-center">
+        <div class="header-status">
+          <div class="status-item" id="status-system">
+            <span class="status-label">SISTEMA</span>
+            <span class="status-value status-active">ATIVO</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">MODO</span>
+            <span class="status-value">AUTOMÁTICO</span>
+          </div>
+          <div class="status-item" id="status-uptime">
+            <span class="status-label">ATUALIZAÇÃO</span>
+            <span class="status-value" id="last-update-time">--:--</span>
+          </div>
+          <div class="status-item status-filter" id="status-centro-custo">
+            <span class="status-label">CENTRO</span>
+            <select id="global-centro-custo" class="header-filter-select">
+              <option value="">Todos</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="header-right">
+        <!-- Quick Mode Controls -->
+        <button class="btn-theme-toggle" id="theme-toggle-btn" title="Alternar Tema Light/Dark" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:color var(--transition-fast);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+        <button class="btn-tv-toggle" id="tv-toggle-btn" title="Modo TV Monitoramento" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:color var(--transition-fast);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </button>
+        <div class="header-clock" id="header-clock">--:--:--</div>
+        <div class="header-date" id="header-date">--/--/----</div>
+        <div class="header-user" id="header-user">
+          <span class="user-avatar" id="user-avatar">U</span>
+          <button class="logout-btn" id="logout-btn" title="Sair">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Layout: Sidebar + Main -->
+    <div class="app-body">
+
+      <!-- Sidebar -->
+      <nav class="sidebar" id="sidebar">
+        <ul class="sidebar-nav">
+          <li><a href="#visao-geral" class="nav-link active" data-page="visao-geral" id="nav-visao-geral">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            <span>Visão Geral</span>
+          </a></li>
+          <li><a href="#historico" class="nav-link" data-page="historico" id="nav-historico">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Histórico</span>
+          </a></li>
+          <li><a href="#alertas" class="nav-link" data-page="alertas" id="nav-alertas">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Alertas</span>
+            <span class="nav-badge" id="alert-badge" style="display:none;">0</span>
+          </a></li>
+          <li><a href="#relatorios" class="nav-link" data-page="relatorios" id="nav-relatorios">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Relatórios</span>
+          </a></li>
+        </ul>
+
+        <div class="sidebar-summary" id="sidebar-summary">
+          <h4>RESUMO RÁPIDO</h4>
+          <div class="summary-item">
+            <span class="summary-label">Temp. Média</span>
+            <span class="summary-value" id="summary-temp">--°C</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Umid. Média</span>
+            <span class="summary-value" id="summary-umid">--%</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Sensores</span>
+            <span class="summary-value" id="summary-sensors">--</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Status</span>
+            <span class="summary-value summary-status" id="summary-status">--</span>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="main-content" id="main-content">
+
+        <!-- ── PAGE: Visão Geral ─────────────── -->
+        <section class="page active" id="page-visao-geral">
+          <!-- Conditions Card -->
+          <div class="card card-conditions" id="card-conditions">
+            <h3 class="card-title">CONDIÇÕES AMBIENTAIS</h3>
+            <div class="conditions-grid" id="conditions-grid">
+              <!-- Filled by JS -->
+            </div>
+            <div class="conditions-indicators" id="conditions-indicators">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+          <!-- Setpoints Card -->
+          <div class="card card-setpoints" id="card-setpoints">
+            <h3 class="card-title">LIMITES RDC50</h3>
+            <div class="setpoints-content" id="setpoints-content">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+          <!-- Room Cards -->
+          <div class="section-row" id="rooms-section" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+            <!-- Filled by JS -->
+          </div>
+
+          <!-- Chart: Historical 24h -->
+          <div class="card card-chart" id="card-chart-24h">
+            <div class="card-header-row">
+              <h3 class="card-title">HISTÓRICO — ÚLTIMAS 24 HORAS</h3>
+              <div class="chart-legend" id="chart-legend-24h"></div>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-24h"></canvas>
+            </div>
+            <div class="chart-stats" id="chart-stats-24h">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+          <!-- Alerts Bar -->
+          <div class="card card-alerts-bar" id="card-alerts-bar">
+            <h3 class="card-title">ALARMES E NOTIFICAÇÕES</h3>
+            <div class="alerts-bar-content" id="alerts-bar-content">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ── PAGE: Histórico ───────────────── -->
+        <section class="page" id="page-historico">
+          <div class="page-header">
+            <h2>Histórico de Leituras</h2>
+            <p>Análise temporal com filtros dinâmicos</p>
+          </div>
+
+          <!-- Filters -->
+          <div class="card card-filters" id="card-filters">
+            <div class="filters-row">
+              <div class="filter-group">
+                <label>Período</label>
+                <div class="filter-buttons" id="filter-period-buttons">
+                  <button class="filter-btn active" data-period="today">Hoje</button>
+                  <button class="filter-btn" data-period="7d">7 Dias</button>
+                  <button class="filter-btn" data-period="30d">30 Dias</button>
+                  <button class="filter-btn" data-period="custom">Personalizado</button>
+                </div>
+              </div>
+              <div class="filter-group filter-custom-dates" id="filter-custom-dates" style="display:none;">
+                <label>Data Início</label>
+                <input type="date" id="filter-date-start" class="filter-input">
+                <label>Data Fim</label>
+                <input type="date" id="filter-date-end" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Sala</label>
+                <select id="filter-sala" class="filter-select">
+                  <option value="">Todas as Salas</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>Centro de Custo</label>
+                <select id="filter-centro-custo" class="filter-select">
+                  <option value="">Todos os Centros</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <button class="btn-primary" id="btn-apply-filters">Aplicar Filtros</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart -->
+          <div class="card card-chart">
+            <div class="card-header-row">
+              <h3 class="card-title">GRÁFICO DE TENDÊNCIA</h3>
+              <div class="chart-actions">
+                <button class="btn-icon" id="btn-export-csv" title="Exportar CSV">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  CSV
+                </button>
+              </div>
+            </div>
+            <div class="chart-container chart-container-lg">
+              <canvas id="chart-historico"></canvas>
+            </div>
+          </div>
+
+          <!-- Data Table -->
+          <div class="card card-table">
+            <div class="card-header-row">
+              <h3 class="card-title">DADOS DETALHADOS</h3>
+              <div class="table-info" id="table-info">-- registros</div>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table" id="data-table">
+                <thead>
+                  <tr>
+                    <th>Data/Hora</th>
+                    <th>Sala</th>
+                    <th>Temperatura</th>
+                    <th>Umidade</th>
+                    <th>Bateria</th>
+                    <th>Online</th>
+                  </tr>
+                </thead>
+                <tbody id="data-table-body">
+                </tbody>
+              </table>
+            </div>
+            <div class="table-pagination" id="table-pagination">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ── PAGE: Alertas ─────────────────── -->
+        <section class="page" id="page-alertas">
+          <div class="page-header">
+            <h2>Central de Alertas</h2>
+            <p>Monitoramento de desvios conforme RDC50/ANVISA</p>
+          </div>
+
+          <div class="card card-filters">
+            <div class="filters-row">
+              <div class="filter-group">
+                <label>Centro de Custo</label>
+                <select id="alertas-centro-custo" class="filter-select">
+                  <option value="">Todos os Centros</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <button class="btn-primary" id="btn-apply-alertas-filters">Aplicar Filtros</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert Counters -->
+          <div class="section-row" id="alert-counters">
+            <div class="card card-counter card-counter-critical" id="counter-critical">
+              <div class="counter-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="counter-info">
+                <span class="counter-value" id="counter-temp-value">0</span>
+                <span class="counter-label">Alertas de Temperatura</span>
+              </div>
+            </div>
+            <div class="card card-counter card-counter-warning" id="counter-warning">
+              <div class="counter-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="counter-info">
+                <span class="counter-value" id="counter-umid-value">0</span>
+                <span class="counter-label">Alertas de Umidade</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert Timeline -->
+          <div class="card">
+            <h3 class="card-title">TIMELINE DE ALERTAS</h3>
+            <div class="alert-timeline" id="alert-timeline">
+              <div class="loading-spinner">Carregando alertas...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── PAGE: Relatórios ──────────────── -->
+        <section class="page" id="page-relatorios">
+          <div class="page-header">
+            <h2>Geração de Relatórios</h2>
+            <p>Relatórios institucionais conforme RDC50/ANVISA</p>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title">CONFIGURAR RELATÓRIO</h3>
+            <div class="report-config">
+              <div class="filter-group">
+                <label>Data Início</label>
+                <input type="date" id="report-date-start" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Data Fim</label>
+                <input type="date" id="report-date-end" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Sala</label>
+                <select id="report-sala" class="filter-select">
+                  <option value="">Todas as Salas</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>Centro de Custo</label>
+                <select id="report-centro-custo" class="filter-select">
+                  <option value="">Todos os Centros</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <button class="btn-primary btn-lg" id="btn-generate-pdf">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  Gerar Relatório PDF
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PDF Preview -->
+          <div class="card" id="report-preview-card" style="display:none;">
+            <h3 class="card-title">PRÉ-VISUALIZAÇÃO DO RELATÓRIO</h3>
+            <div class="report-preview" id="report-preview">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- Mobile Bottom Nav -->
+    <nav class="mobile-nav" id="mobile-nav">
+      <a href="#visao-geral" class="mobile-nav-item active" data-page="visao-geral">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span>Geral</span>
+      </a>
+      <a href="#historico" class="mobile-nav-item" data-page="historico">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Histórico</span>
+      </a>
+      <a href="#alertas" class="mobile-nav-item" data-page="alertas">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <span>Alertas</span>
+      </a>
+      <a href="#relatorios" class="mobile-nav-item" data-page="relatorios">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>PDF</span>
+      </a>
+    </nav>
+  </div>
+
+  <!-- Scripts with cache busters -->
+  <script src="/js/charts.js?v=13"></script>
+  <script src="/js/dashboard.js?v=13"></script>
+  <script src="/js/historico.js?v=13"></script>
+  <script src="/js/alertas.js?v=13"></script>
+  <script src="/js/relatorio.js?v=13"></script>
+  <script src="/js/app.js?v=13"></script>
+</body>
+</html>

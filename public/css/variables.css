@@ -1,0 +1,132 @@
+/* ═══════════════════════════════════════════════
+   NM Serviços — Design Tokens
+   Brand Guide: Cores, Tipografia, Espaçamentos
+   ═══════════════════════════════════════════════ */
+
+:root {
+  /* ── Brand Colors (NM Serviços Guidelines) ── */
+  --nm-azul:        #0B235C; /* Azul NM from Brand Guidelines */
+  --nm-branco:      #FFFFFF;
+  --nm-cinza-claro: #F2F4F7;
+  --nm-azul-aco:    #3D5A8C; /* Azul Aço */
+
+  /* ── Secondary Colors ────────────────────── */
+  --nm-cinza-medio: #788794; /* Cinza Médio */
+  --nm-grafite:     #1E2329; /* Grafite */
+  --nm-cinza-escuro:#3A4049; /* Cinza Escuro */
+
+  /* ── Accent Colors ───────────────────────── */
+  --nm-azul-profundo: #0B235C;
+  --nm-verde:       #26C281; /* Verde Técnico */
+  --nm-laranja:     #FF8A00; /* Laranja */
+  --nm-vermelho:    #E74C3C;
+  --nm-amarelo:     #F1C40F;
+  --nm-ciano:       #00B3C6; /* Ciano from Brand Guidelines */
+
+  /* ── Gradients ───────────────────────────── */
+  --grad-azul:      linear-gradient(135deg, #0B235C 0%, #00B3C6 100%);
+  --grad-azul-deep: linear-gradient(135deg, #0B235C 0%, #3D5A8C 100%);
+  --grad-grafite:   linear-gradient(135deg, #1E2329 0%, #3A4049 100%);
+  --grad-dark:      linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+
+  /* ── DEFAULT THEME: LIGHT / BRAND MODE ── */
+  --bg-primary:     #F2F4F7; /* Cinza Claro */
+  --bg-secondary:   #FFFFFF;
+  --bg-card:        #FFFFFF;
+  --bg-card-hover:  #F8FAFC;
+  --bg-elevated:    #FFFFFF;
+  --border-color:   rgba(11, 35, 92, 0.08);
+  --border-light:   rgba(11, 35, 92, 0.15);
+
+  --text-primary:   #1E2329; /* Grafite */
+  --text-secondary: #788794; /* Cinza Médio */
+  --text-muted:     #A0AEC0;
+  --accent-color:   #0B235C; /* Azul NM NM Serviços */
+  --login-card-bg:  rgba(255, 255, 255, 0.85);
+
+  /* ── Status Colors ───────────────────────── */
+  --status-normal:  #26C281;
+  --status-atencao: #F1C40F;
+  --status-critico: #E74C3C;
+  --status-info:    #00B3C6;
+  --status-offline: #788794;
+
+  /* ── Typography ──────────────────────────── */
+  --font-headline:  'Cinzel', serif;
+  --font-body:      'Montserrat', sans-serif;
+
+  --fs-xs:   0.65rem;
+  --fs-sm:   0.75rem;
+  --fs-base: 0.875rem;
+  --fs-md:   1rem;
+  --fs-lg:   1.25rem;
+  --fs-xl:   1.5rem;
+  --fs-2xl:  2rem;
+  --fs-3xl:  2.5rem;
+
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semibold:600;
+  --fw-bold:    700;
+
+  /* ── Spacing ─────────────────────────────── */
+  --space-2xs: 4px;
+  --space-xs:  8px;
+  --space-sm:  12px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* ── Border Radius ───────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* ── Shadows ─────────────────────────────── */
+  --shadow-sm:  0 1px 3px rgba(11,35,92,0.05);
+  --shadow-md:  0 4px 12px rgba(11,35,92,0.08);
+  --shadow-lg:  0 8px 24px rgba(11,35,92,0.12);
+  --shadow-glow-blue:  0 0 20px rgba(11,35,92,0.15);
+  --shadow-glow-green: 0 0 20px rgba(38,194,129,0.15);
+  --shadow-glow-red:   0 0 20px rgba(231,76,60,0.15);
+
+  /* ── Transitions ─────────────────────────── */
+  --transition-fast:   150ms ease;
+  --transition-base:   250ms ease;
+  --transition-slow:   400ms ease;
+  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Layout ──────────────────────────────── */
+  --sidebar-width:     240px;
+  --sidebar-collapsed: 64px;
+  --header-height:     60px;
+  --mobile-nav-height: 60px;
+}
+
+/* ── DARK THEME OVERLAY ── */
+body.dark-mode {
+  --bg-primary:     #0d1117;
+  --bg-secondary:   #161b22;
+  --bg-card:        #1c2128;
+  --bg-card-hover:  #21262d;
+  --bg-elevated:    #242a33;
+  --border-color:   rgba(255,255,255,0.06);
+  --border-light:   rgba(255,255,255,0.1);
+
+  --text-primary:   #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted:     #768390; /* Improved contrast for dark mode */
+  --accent-color:   #00B3C6; /* Ciano from guidelines for dark contrast */
+  --login-card-bg:  rgba(28, 33, 40, 0.85);
+
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.5);
+  --shadow-glow-blue:  0 0 20px rgba(11,35,92,0.3);
+  --shadow-glow-green: 0 0 20px rgba(38,194,129,0.3);
+  --shadow-glow-red:   0 0 20px rgba(231,76,60,0.3);
+}
