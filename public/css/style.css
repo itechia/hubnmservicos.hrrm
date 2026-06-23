@@ -3166,6 +3166,10 @@ body.dark-mode .energy-icon-wrapper {
   margin-bottom: var(--space-md);
 }
 
+#energia-geracao-kpis {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .energy-kpi-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -3314,6 +3318,7 @@ body.dark-mode .energy-icon-wrapper {
 
 @media (max-width: 1200px) {
   .energy-kpi-grid,
+  #energia-geracao-kpis,
   .energy-phase-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -1,3 +1,4 @@
+process.env.TZ = 'America/Belem';
 import express from 'express';
 import cors from 'cors';
 import mysql from 'mysql2/promise';
@@ -43,6 +44,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   connectTimeout: 15000,
+  timezone: '-03:00',
 });
 
 // ── RDC50 Limits ────────────────────────────────────────────────
