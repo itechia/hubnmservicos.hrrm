@@ -22,7 +22,7 @@
   <!-- CSS with cache buster -->
   <link rel="stylesheet" href="/css/variables.css?v=13">
   <link rel="stylesheet" href="/css/login.css?v=13">
-  <link rel="stylesheet" href="/css/style.css?v=25">
+  <link rel="stylesheet" href="/css/style.css?v=26">
 </head>
 <body>
 
@@ -938,14 +938,22 @@
     <span>Sair do Modo Monitoramento</span>
   </button>
 
+  <div id="app-loading-overlay" class="app-loading-overlay" style="display: none;" role="status" aria-live="polite">
+    <div class="app-loading-card">
+      <span class="app-loading-spinner"></span>
+      <strong id="app-loading-title">Carregando...</strong>
+      <small id="app-loading-message">Aguarde enquanto processamos as informa&ccedil;&otilde;es.</small>
+    </div>
+  </div>
+
   <!-- Scripts with cache busters -->
   <script src="/js/charts.js?v=26"></script>
   <script src="/js/dashboard.js?v=13"></script>
   <script src="/js/historico.js?v=13"></script>
   <script src="/js/alertas.js?v=13"></script>
-  <script src="/js/relatorio.js?v=13"></script>
-  <script src="/js/energia.js?v=28"></script>
-  <script src="/js/energia-historico.js?v=28"></script>
-  <script src="/js/app.js?v=28"></script>
+  <script src="/js/relatorio.js?v=14"></script>
+  <script src="/js/energia.js?v=30"></script>
+  <script src="/js/energia-historico.js?v=30"></script>
+  <script src="/js/app.js?v=30"></script>
 </body>
 </html>

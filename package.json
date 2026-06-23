@@ -2,8 +2,10 @@
   "name": "hrrm-monitoring-hub",
   "version": "1.0.0",
   "description": "Hub de Monitoramento Hospitalar HRRM - Central de Controle",
+  "main": "server.js",
   "type": "module",
   "scripts": {
+    "build": "echo \"No build step required\"",
     "dev": "node server.js",
     "start": "node server.js"
   },

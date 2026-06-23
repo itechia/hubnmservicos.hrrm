@@ -14,7 +14,7 @@ const EnergiaHistorico = {
     await this.loadConfig();
     this.setupListeners();
     this.setDefaultDates();
-    await this.applyFilters();
+    await this.applyFilters({ silent: true });
   },
 
   async loadConfig() {
@@ -70,7 +70,11 @@ const EnergiaHistorico = {
     return params.toString();
   },
 
-  async applyFilters() {
+  async applyFilters(options = {}) {
+    if (!options.silent) {
+      App.showLoading('Carregando histórico de energia...', 'Consultando leituras do período selecionado e atualizando gráficos.');
+      App.setButtonLoading('btn-energia-hist-filtrar', true, 'Carregando...');
+    }
     try {
       const query = this.getFiltersQuery();
       const url = `/api/energia/iot/historico${query ? `?${query}` : ''}`;
@@ -80,6 +84,11 @@ const EnergiaHistorico = {
       this.renderTable();
     } catch (err) {
       console.error('Error applying energy history filters:', err);
+    } finally {
+      if (!options.silent) {
+        App.setButtonLoading('btn-energia-hist-filtrar', false);
+        App.hideLoading();
+      }
     }
   },
 

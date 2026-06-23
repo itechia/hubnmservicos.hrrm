@@ -61,6 +61,42 @@ const App = {
     this.startClock();
   },
 
+  showLoading(title = 'Carregando...', message = 'Aguarde enquanto processamos as informa\u00e7\u00f5es.') {
+    const overlay = document.getElementById('app-loading-overlay');
+    const titleEl = document.getElementById('app-loading-title');
+    const messageEl = document.getElementById('app-loading-message');
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    if (overlay) overlay.style.display = 'flex';
+  },
+
+  hideLoading() {
+    const overlay = document.getElementById('app-loading-overlay');
+    if (overlay) overlay.style.display = 'none';
+  },
+
+  setButtonLoading(buttonOrId, loading, loadingText = 'Carregando...') {
+    const button = typeof buttonOrId === 'string'
+      ? document.getElementById(buttonOrId)
+      : buttonOrId;
+    if (!button) return;
+
+    if (loading) {
+      button.dataset.originalHtml = button.innerHTML;
+      button.innerHTML = '<span class="btn-loader" style="display:inline-block;"></span> ' + loadingText;
+      button.disabled = true;
+      button.classList.add('is-loading');
+      return;
+    }
+
+    if (button.dataset.originalHtml) {
+      button.innerHTML = button.dataset.originalHtml;
+      delete button.dataset.originalHtml;
+    }
+    button.disabled = false;
+    button.classList.remove('is-loading');
+  },
+
   // ── Theme Toggle ─────────────────────────
   setupToggles() {
     const themeBtn = document.getElementById('theme-toggle-btn');
@@ -200,14 +236,14 @@ const App = {
         // Real-time energy refresh: every 30 seconds
         if (now - this.lastRefresh.energyRede >= 30 * 1000) {
           this.lastRefresh.energyRede = now;
-          await Energia.refreshRede({ filtered: false });
+          await Energia.refreshRede({ filtered: false, silent: true });
         }
-      } else if (this.currentPage === 'energia-solar') {
-        // Solar energy refresh: once a day (every 24 hours)
-        if (now - this.lastRefresh.energySolar >= 24 * 60 * 60 * 1000) {
-          this.lastRefresh.energySolar = now;
-          await Energia.refreshGeracao();
-        }
+    } else if (this.currentPage === 'energia-solar') {
+      // Solar energy refresh: once a day (every 24 hours)
+      if (now - this.lastRefresh.energySolar >= 24 * 60 * 60 * 1000) {
+        this.lastRefresh.energySolar = now;
+        await Energia.refreshGeracao({ silent: true });
+      }
       }
     }, 5000);
   },
@@ -376,16 +412,16 @@ const App = {
       }
     } else if (page === 'energia-solar') {
       if (this.lastRefresh) this.lastRefresh.energySolar = Date.now();
-      Energia.refreshGeracao();
+      Energia.refreshGeracao({ silent: true });
     } else if (page === 'rede-eletrica') {
       if (this.lastRefresh) this.lastRefresh.energyRede = Date.now();
-      Energia.refreshRede({ filtered: false });
+      Energia.refreshRede({ filtered: false, silent: true });
     } else if (page === 'relatorio-energia') {
       if (this.lastRefresh) this.lastRefresh.energyRede = Date.now();
-      Energia.refreshRede({ filtered: true });
+      Energia.refreshRede({ filtered: true, silent: true });
     } else if (page === 'historico-energia') {
       if (this.lastRefresh) this.lastRefresh.energyRede = Date.now();
-      EnergiaHistorico.applyFilters();
+      EnergiaHistorico.applyFilters({ silent: true });
     }
 
     // Close sidebar on mobile

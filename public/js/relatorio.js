@@ -17,6 +17,7 @@ const Relatorio = {
     const originalText = btn.innerHTML;
     btn.innerHTML = '<span class="btn-loader" style="display:inline-block;"></span> Gerando...';
     btn.disabled = true;
+    App.showLoading('Gerando PDF de temperatura...', 'Buscando leituras, calculando estatísticas e montando o relatório.');
 
     try {
       // 1. Fetch data from backend JSON endpoints
@@ -373,6 +374,7 @@ const Relatorio = {
     } finally {
       btn.innerHTML = originalText;
       btn.disabled = false;
+      App.hideLoading();
     }
   },
 

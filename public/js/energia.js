@@ -72,7 +72,11 @@ const Energia = {
     return params.toString();
   },
 
-  async refreshGeracao() {
+  async refreshGeracao(options = {}) {
+    if (!options.silent) {
+      App.showLoading('Carregando geração solar...', 'Consultando histórico, KPIs e comparativo mensal.');
+      App.setButtonLoading('btn-energia-geracao-filtrar', true, 'Carregando...');
+    }
     try {
       const query = this.getGeracaoQuery();
       const suffix = query ? `?${query}` : '';
@@ -89,6 +93,11 @@ const Energia = {
     } catch (err) {
       console.error('Error refreshing generation dashboard:', err);
       this.renderGeracaoError(err);
+    } finally {
+      if (!options.silent) {
+        App.setButtonLoading('btn-energia-geracao-filtrar', false);
+        App.hideLoading();
+      }
     }
   },
 
@@ -130,6 +139,14 @@ const Energia = {
   },
 
   async refreshRede(options = {}) {
+    if (!options.silent) {
+      const title = options.filtered ? 'Aplicando filtros de energia...' : 'Carregando monitoramento elétrico...';
+      const message = options.filtered
+        ? 'Consultando histórico filtrado e inconformidades da rede.'
+        : 'Buscando leituras atuais, fases e estatísticas operacionais.';
+      App.showLoading(title, message);
+      if (options.filtered) App.setButtonLoading('btn-energia-iot-filtrar', true, 'Filtrando...');
+    }
     try {
       const query = options.filtered
         ? this.getRedeQuery({ limit: '500' })
@@ -151,6 +168,11 @@ const Energia = {
     } catch (err) {
       console.error('Error refreshing electrical dashboard:', err);
       this.renderRedeError(err);
+    } finally {
+      if (!options.silent) {
+        if (options.filtered) App.setButtonLoading('btn-energia-iot-filtrar', false);
+        App.hideLoading();
+      }
     }
   },
 
@@ -409,6 +431,8 @@ const Energia = {
   },
 
   async generatePdf() {
+    App.showLoading('Gerando PDF de energia...', 'Montando relatório com resumo e detalhamento. Esse processo pode levar alguns segundos.');
+    App.setButtonLoading('btn-energia-report-pdf', true, 'Gerando PDF...');
     const tipo = document.getElementById('energia-report-tipo')?.value || 'geracao';
     const inicio = document.getElementById('energia-report-inicio')?.value || '';
     const fim = document.getElementById('energia-report-fim')?.value || '';
@@ -417,20 +441,28 @@ const Energia = {
     if (fim) params.set('fim', tipo === 'rede' ? `${fim} 23:59:59` : fim);
     const suffix = params.toString() ? `?${params.toString()}` : '';
 
-    if (tipo === 'rede') {
-      const [stats, rows] = await Promise.all([
-        API.get(`/api/energia/iot/stats${suffix}`),
-        API.get(`/api/energia/iot/historico${suffix}`),
-      ]);
-      await this.buildEnergyPdf('RELATÓRIO DE MONITORAMENTO DA REDE ELÉTRICA', stats.geral, rows, 'rede', inicio, fim);
-      return;
-    }
+    try {
+      if (tipo === 'rede') {
+        const [stats, rows] = await Promise.all([
+          API.get(`/api/energia/iot/stats${suffix}`),
+          API.get(`/api/energia/iot/historico${suffix}`),
+        ]);
+        await this.buildEnergyPdf('RELATÓRIO DE MONITORAMENTO DA REDE ELÉTRICA', stats.geral, rows, 'rede', inicio, fim);
+        return;
+      }
 
-    const [stats, rows] = await Promise.all([
-      API.get(`/api/energia/geracao/stats${suffix}`),
-      API.get(`/api/energia/geracao/historico${suffix}`),
-    ]);
-    await this.buildEnergyPdf('RELATÓRIO DE GERAÇÃO DE ENERGIA SOLAR', stats.geral, rows, 'geracao', inicio, fim);
+      const [stats, rows] = await Promise.all([
+        API.get(`/api/energia/geracao/stats${suffix}`),
+        API.get(`/api/energia/geracao/historico${suffix}`),
+      ]);
+      await this.buildEnergyPdf('RELATÓRIO DE GERAÇÃO DE ENERGIA SOLAR', stats.geral, rows, 'geracao', inicio, fim);
+    } catch (err) {
+      console.error('Error generating energy PDF:', err);
+      alert('Erro ao gerar PDF de energia. Verifique os filtros e tente novamente.');
+    } finally {
+      App.setButtonLoading('btn-energia-report-pdf', false);
+      App.hideLoading();
+    }
   },
 
   async buildEnergyPdf(title, summary, rows, type, inicio, fim) {
