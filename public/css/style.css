@@ -33,6 +33,31 @@ body {
   margin-top: var(--header-height);
 }
 
+body[data-module="hub"] .sidebar,
+body[data-module="hub"] .mobile-nav {
+  display: none !important;
+}
+
+body[data-module="hub"] .sidebar-toggle,
+body[data-module="hub"] .header-center {
+  display: none !important;
+}
+
+body[data-module="hub"] .main-content {
+  width: 100%;
+  margin-left: 0;
+  padding: clamp(24px, 4vw, 48px);
+}
+
+body[data-module="hub"] #page-hub.active {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  justify-content: flex-start;
+  min-height: calc(100vh - var(--header-height) - clamp(48px, 8vw, 96px));
+  padding-top: var(--space-lg);
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    TOP HEADER
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -2861,4 +2886,833 @@ body.tv-mode #rooms-section .equipment-row:nth-of-type(n+4) {
 
 body.tv-mode .sidebar-toggle {
   display: none !important;
+}
+
+/* Module hub */
+.hub-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 155px;
+  padding: clamp(20px, 3.5vw, 32px);
+  background: linear-gradient(135deg, #071D49 0%, #0B235C 45%, #026595 100%);
+  color: #fff;
+  overflow: hidden;
+  position: relative;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border-top: 4px solid var(--accent-color);
+}
+
+body.dark-mode .hub-hero {
+  border-top: 4px solid #00B3C6;
+  background: linear-gradient(135deg, #030815 0%, #0B235C 50%, #004c55 100%);
+}
+
+.hub-hero-mesh {
+  position: absolute !important;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+}
+
+.hub-hero::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.hub-hero-content {
+  flex: 1;
+  z-index: 2;
+}
+
+.hub-hero-graphic {
+  opacity: 0.15;
+  position: absolute;
+  right: -20px;
+  bottom: -40px;
+  z-index: 2;
+  pointer-events: none;
+  color: #00B3C6;
+  transition: transform 12s linear;
+}
+
+.hub-hero:hover .hub-hero-graphic {
+  transform: rotate(360deg);
+}
+
+.hub-eyebrow {
+  display: inline-block;
+  margin-bottom: var(--space-xs);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.hub-hero h2 {
+  margin: 0 0 var(--space-xs);
+  color: #fff;
+  font-family: var(--font-headline);
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  line-height: 1.15;
+  text-transform: none;
+}
+
+.hub-hero p {
+  max-width: 680px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: var(--fs-base);
+  line-height: 1.4;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-lg);
+  margin-top: var(--space-md);
+}
+
+.module-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: auto;
+  padding: var(--space-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.module-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-color);
+  box-shadow: var(--shadow-lg);
+}
+
+.module-card-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  transition: background var(--transition-base), color var(--transition-base);
+}
+
+.temp-icon-wrapper {
+  background: rgba(11, 35, 92, 0.06);
+  color: #0B235C;
+}
+
+body.dark-mode .temp-icon-wrapper {
+  background: rgba(0, 179, 198, 0.12);
+  color: #00B3C6;
+}
+
+.energy-icon-wrapper {
+  background: rgba(255, 138, 0, 0.08);
+  color: #FF8A00;
+}
+
+body.dark-mode .energy-icon-wrapper {
+  background: rgba(255, 138, 0, 0.15);
+  color: #FF8A00;
+}
+
+.module-card-body {
+  flex: 1;
+}
+
+.module-card-body strong {
+  display: block;
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.module-card-body small {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.module-card-arrow {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-base), color var(--transition-base);
+}
+
+.module-card:hover .module-card-arrow {
+  transform: translateX(4px);
+  color: var(--accent-color);
+}
+
+.hub-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  margin-top: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.hub-footer-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.hub-footer-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--nm-verde);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--nm-verde);
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+@media (max-width: 900px) {
+  .module-grid {
+    grid-template-columns: 1fr;
+  }
+  .hub-footer {
+    flex-direction: column;
+    gap: var(--space-sm);
+    align-items: flex-start;
+  }
+}
+
+/* Electrical energy hub */
+.energy-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.energy-kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--nm-ciano);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.energy-kpi-card span,
+.phase-card span {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.energy-kpi-card strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: var(--fs-xl);
+  margin: var(--space-xs) 0 var(--space-2xs);
+}
+
+.energy-kpi-card small {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+
+.energy-kpi-card.solar,
+.energy-kpi-card.success {
+  border-left-color: var(--nm-verde);
+}
+
+.energy-kpi-card.warning {
+  border-left-color: var(--nm-amarelo);
+}
+
+.energy-kpi-card.danger {
+  border-left-color: var(--nm-vermelho);
+}
+
+.energy-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.7fr);
+  gap: var(--space-md);
+  align-items: stretch;
+}
+
+.energy-layout .card {
+  margin-bottom: var(--space-md);
+}
+
+.energy-insights {
+  display: flex;
+  flex-direction: column;
+}
+
+.energy-insight-list {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.energy-insight-list > div {
+  padding: var(--space-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.energy-insight-list strong {
+  display: block;
+  color: var(--accent-color);
+  font-size: var(--fs-lg);
+  margin-bottom: 2px;
+}
+
+.energy-insight-list span,
+.energy-reference {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.energy-reference {
+  margin-top: var(--space-md);
+  line-height: 1.5;
+}
+
+.energy-phase-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.phase-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-top: 4px solid var(--nm-verde);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  text-align: center;
+}
+
+.phase-card strong {
+  display: block;
+  font-size: var(--fs-lg);
+  margin: var(--space-xs) 0;
+  color: var(--text-primary);
+}
+
+.phase-card small {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+
+.phase-card.atencao {
+  border-top-color: var(--nm-amarelo);
+}
+
+.phase-card.critico,
+.phase-card.sem_leitura {
+  border-top-color: var(--nm-vermelho);
+}
+
+.energy-note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.energy-note {
+  padding: var(--space-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.energy-note strong {
+  color: var(--text-primary);
+}
+
+@media (max-width: 1200px) {
+  .energy-kpi-grid,
+  .energy-phase-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .energy-layout,
+  .energy-note-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* TV Mode adjustments for Energy Solar and Real-Time Energy pages */
+body.tv-mode .app-body {
+  height: calc(100vh - var(--header-height)) !important;
+  margin-top: var(--header-height) !important;
+}
+
+body.tv-mode #page-visao-geral.active {
+  height: calc(100vh - var(--header-height) - 16px) !important;
+}
+
+body.tv-mode #page-energia-solar.active,
+body.tv-mode #page-rede-eletrica.active {
+  height: calc(100vh - var(--header-height) - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+body.tv-mode #page-energia-solar.active .card-filters,
+body.tv-mode #page-energia-solar.active .page-header,
+body.tv-mode #page-rede-eletrica.active .page-header {
+  display: none !important;
+}
+
+body.tv-mode #page-energia-solar.active .energy-layout {
+  flex: 1.2;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 8px;
+  margin-bottom: 0 !important;
+}
+
+body.tv-mode #page-rede-eletrica.active .energy-layout-monitor {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 8px;
+  margin-bottom: 0 !important;
+}
+
+body.tv-mode #page-energia-solar.active .card-table {
+  flex: 0.8;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0 !important;
+  padding: 8px 12px !important;
+}
+
+body.tv-mode #page-energia-solar.active .card-table .table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+body.tv-mode #page-energia-solar.active .card-table .data-table {
+  font-size: 0.72rem;
+}
+
+body.tv-mode #page-energia-solar.active .card-table .data-table th,
+body.tv-mode #page-energia-solar.active .card-table .data-table td {
+  padding: 4px 8px !important;
+}
+
+body.tv-mode #page-energia-solar.active .energy-layout .card,
+body.tv-mode #page-rede-eletrica.active .energy-layout-monitor .card {
+  margin-bottom: 0 !important;
+}
+
+body.tv-mode #page-energia-solar.active .energy-layout .card-chart,
+body.tv-mode #page-rede-eletrica.active .energy-layout-monitor .card-chart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+body.tv-mode #page-energia-solar.active .energy-layout .card-chart .chart-container,
+body.tv-mode #page-rede-eletrica.active .energy-layout-monitor .card-chart .chart-container {
+  flex: 1;
+  height: 100% !important;
+  min-height: 0;
+}
+
+/* TV Modal Backdrop */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn var(--transition-fast) forwards;
+}
+
+/* TV Modal Card */
+.tv-modal-card {
+  width: 92%;
+  max-width: 500px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: slideUp var(--transition-spring) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  color: var(--text-primary);
+  font-weight: var(--fw-bold);
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-2xs);
+  transition: color var(--transition-fast);
+  line-height: 1;
+}
+
+.modal-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: var(--space-lg);
+}
+
+.modal-desc {
+  margin: 0 0 var(--space-md);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.tv-group-title {
+  display: block;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tv-option-group {
+  margin-bottom: var(--space-lg);
+}
+
+.tv-checkbox-label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.tv-checkbox-label:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-color);
+}
+
+.tv-checkbox-label input[type="checkbox"] {
+  display: none;
+}
+
+.checkbox-custom {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--text-muted);
+  border-radius: 4px;
+  position: relative;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.tv-checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+  border-color: var(--nm-verde);
+  background: var(--nm-verde);
+}
+
+.tv-checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid var(--nm-branco);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.option-text strong {
+  display: block;
+  font-size: var(--fs-base);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.option-text small {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.tv-input-group {
+  margin-bottom: var(--space-lg);
+}
+
+.tv-input-group label {
+  display: block;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.tv-input-group input[type="number"] {
+  width: 100%;
+  padding: var(--space-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  transition: border-color var(--transition-fast);
+}
+
+.tv-input-group input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+}
+
+/* Floating Exit Button */
+.tv-exit-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(11, 35, 92, 0.85); /* Semi-transparent Brand Blue */
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-full);
+  padding: var(--space-xs) var(--space-md);
+  color: var(--nm-branco);
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  z-index: 10000; /* Over everything */
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.tv-exit-btn:hover {
+  transform: translateY(-2px);
+  background: var(--nm-azul);
+}
+
+/* Mobile responsive adjustments for Energy and Reports */
+@media (max-width: 576px) {
+  .energy-kpi-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-sm) !important;
+  }
+
+  .energy-phase-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-xs) !important;
+  }
+
+  .energy-note-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-xs) !important;
+  }
+
+  .phase-card {
+    padding: var(--space-xs) !important;
+  }
+
+  .phase-card strong {
+    font-size: var(--fs-base) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   ENERGIA HISTÓRICO & TV MODE polish
+   ═══════════════════════════════════════════════ */
+
+/* 50/50 grid layout for historical charts */
+#page-historico-energia .energy-layout-monitor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+  #page-historico-energia .energy-layout-monitor {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Hide filters and page headers globally when in TV carousel mode */
+body.tv-mode .page-header,
+body.tv-mode .card-filters {
+  display: none !important;
+}
+
+/* TV mode layouts for historical pages */
+body.tv-mode #page-historico-energia.active,
+body.tv-mode #page-historico.active {
+  height: calc(100vh - var(--header-height) - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* TV Mode optimization for Temperature History page */
+body.tv-mode #page-historico.active .card-chart {
+  flex: 1.2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0 !important;
+}
+body.tv-mode #page-historico.active .card-chart .chart-container {
+  flex: 1;
+  height: 100% !important;
+  min-height: 0;
+}
+body.tv-mode #page-historico.active .card-table {
+  flex: 0.8;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0 !important;
+  padding: 8px 12px !important;
+}
+body.tv-mode #page-historico.active .card-table .table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+body.tv-mode #page-historico.active .card-table .data-table {
+  font-size: 0.72rem;
+}
+body.tv-mode #page-historico.active .card-table .data-table th,
+body.tv-mode #page-historico.active .card-table .data-table td {
+  padding: 4px 8px !important;
+}
+
+/* TV Mode optimization for Energy History page */
+body.tv-mode #page-historico-energia.active .energy-layout-monitor {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 0 !important;
+}
+body.tv-mode #page-historico-energia.active .card-table {
+  flex: 0.8;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0 !important;
+  padding: 8px 12px !important;
+}
+body.tv-mode #page-historico-energia.active .card-table .table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+body.tv-mode #page-historico-energia.active .card-table .data-table {
+  font-size: 0.72rem;
+}
+body.tv-mode #page-historico-energia.active .card-table .data-table th,
+body.tv-mode #page-historico-energia.active .card-table .data-table td {
+  padding: 4px 8px !important;
+}
+body.tv-mode #page-historico-energia.active .energy-layout-monitor .card {
+  margin-bottom: 0 !important;
+}
+body.tv-mode #page-historico-energia.active .energy-layout-monitor .card-chart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+body.tv-mode #page-historico-energia.active .energy-layout-monitor .card-chart .chart-container {
+  flex: 1;
+  height: 100% !important;
+  min-height: 0;
 }

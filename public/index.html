@@ -17,11 +17,12 @@
 
   <!-- PDF-Lib for Client-Side PDF Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
 
   <!-- CSS with cache buster -->
   <link rel="stylesheet" href="/css/variables.css?v=13">
   <link rel="stylesheet" href="/css/login.css?v=13">
-  <link rel="stylesheet" href="/css/style.css?v=13">
+  <link rel="stylesheet" href="/css/style.css?v=25">
 </head>
 <body>
 
@@ -33,8 +34,7 @@
     <div class="login-card" id="login-card">
       <div class="login-logo" style="text-align: center;">
         <img src="/logo.png" alt="NM Serviços Logo" style="max-height: 90px; width: auto; margin-bottom: var(--space-md); filter: drop-shadow(0 4px 8px rgba(11,35,92,0.1));">
-        <h1 style="font-family: var(--font-headline); font-size: var(--fs-xl); margin: 0 0 var(--space-2xs);">NM Serviços</h1>
-        <p class="login-subtitle">Central de Monitoramento Hospitalar</p>
+        <h2 style="font-family: var(--font-body); font-size: 1.15rem; font-weight: var(--fw-semibold); margin: 0 0 var(--space-2xs); line-height: 1.4; color: var(--text-primary);">Central de Monitoramento Operacional | HRRM</h2>
       </div>
 
       <form id="login-form" autocomplete="off">
@@ -80,7 +80,7 @@
           <img src="/logo.png" alt="NM Serviços Logo" style="height: 32px; width: auto;" class="header-logo-img">
           <div>
             <span class="brand-name">NM Serviços</span>
-            <span class="brand-module">Controle de Temperatura</span>
+            <span class="brand-module">Hub de Monitoramento</span>
           </div>
         </div>
       </div>
@@ -131,22 +131,42 @@
       <!-- Sidebar -->
       <nav class="sidebar" id="sidebar">
         <ul class="sidebar-nav">
-          <li><a href="#visao-geral" class="nav-link active" data-page="visao-geral" id="nav-visao-geral">
+          <li class="hub-nav"><a href="#hub" class="nav-link active" data-page="hub" id="nav-hub">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>
+            <span>Hub de Módulos</span>
+          </a></li>
+          <li class="temp-module"><a href="#visao-geral" class="nav-link" data-page="visao-geral" id="nav-visao-geral">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
             <span>Visão Geral</span>
           </a></li>
-          <li><a href="#historico" class="nav-link" data-page="historico" id="nav-historico">
+          <li class="temp-module"><a href="#historico" class="nav-link" data-page="historico" id="nav-historico">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span>Histórico</span>
           </a></li>
-          <li><a href="#alertas" class="nav-link" data-page="alertas" id="nav-alertas">
+          <li class="temp-module"><a href="#alertas" class="nav-link" data-page="alertas" id="nav-alertas">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <span>Alertas</span>
             <span class="nav-badge" id="alert-badge" style="display:none;">0</span>
           </a></li>
-          <li><a href="#relatorios" class="nav-link" data-page="relatorios" id="nav-relatorios">
+          <li class="temp-module"><a href="#relatorios" class="nav-link" data-page="relatorios" id="nav-relatorios">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <span>Relatórios</span>
+          </a></li>
+          <li class="energy-module energy-only"><a href="#rede-eletrica" class="nav-link" data-page="rede-eletrica" id="nav-rede-eletrica">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Monitoramento</span>
+          </a></li>
+          <li class="energy-module energy-only"><a href="#energia-solar" class="nav-link" data-page="energia-solar" id="nav-energia-solar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            <span>Geração Solar</span>
+          </a></li>
+          <li class="energy-module energy-only"><a href="#historico-energia" class="nav-link" data-page="historico-energia" id="nav-historico-energia">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Histórico Energia</span>
+          </a></li>
+          <li class="energy-module energy-only"><a href="#relatorio-energia" class="nav-link" data-page="relatorio-energia" id="nav-relatorio-energia">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Relatórios Energia</span>
           </a></li>
         </ul>
 
@@ -174,8 +194,94 @@
       <!-- Main Content -->
       <main class="main-content" id="main-content">
 
-        <!-- ── PAGE: Visão Geral ─────────────── -->
-        <section class="page active" id="page-visao-geral">
+        <!--  PAGE: Visão Geral  -->
+        <section class="page active" id="page-hub">
+          <div class="hub-container">
+            <div class="hub-hero card">
+              <!-- High-tech background grid pattern -->
+              <svg class="hub-hero-mesh" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="mesh" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255, 255, 255, 0.04)" stroke-width="1"/>
+                    <circle cx="40" cy="0" r="1.2" fill="rgba(255, 255, 255, 0.08)"/>
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#mesh)" />
+              </svg>
+              
+              <div class="hub-hero-content">
+                <span class="hub-eyebrow">HUB NM SERVIÇOS - HRRM</span>
+                <h2>Central de Monitoramento Operacional</h2>
+                <p>Escolha a área de monitoramento. Cada módulo mantém seus próprios painéis, relatórios e modo TV.</p>
+              </div>
+              <div class="hub-hero-graphic">
+                <svg width="220" height="220" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </div>
+            </div>
+            
+            <div class="module-grid">
+              <div class="module-card" data-module-target="visao-geral">
+                <div class="module-card-icon-wrapper temp-icon-wrapper">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                  </svg>
+                </div>
+                <div class="module-card-body">
+                  <strong>Controle de Temperatura</strong>
+                  <small>Ambientes, histórico, alertas RDC50 e relatórios de temperatura e umidade.</small>
+                </div>
+                <div class="module-card-arrow">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </div>
+              </div>
+              
+              <div class="module-card energy-only" data-module-target="rede-eletrica">
+                <div class="module-card-icon-wrapper energy-icon-wrapper">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                </div>
+                <div class="module-card-body">
+                  <strong>Controle de Energia</strong>
+                  <small>Monitoramento elétrico em tempo real, geração solar e relatórios operacionais.</small>
+                </div>
+                <div class="module-card-arrow">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="hub-footer">
+              <div class="hub-footer-item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <span>Última atualização: <span id="hub-last-update">--/--/---- --:--:--</span></span>
+              </div>
+              <div class="hub-footer-item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span>Status do sistema: <span class="hub-status-text">Operacional</span> <span class="hub-footer-dot"></span></span>
+              </div>
+              <div class="hub-footer-item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
+                </svg>
+                <span>Ambiente: <strong>Produção</strong></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page temp-module" id="page-visao-geral">
           <!-- Conditions Card -->
           <div class="card card-conditions" id="card-conditions">
             <h3 class="card-title">CONDIÇÕES AMBIENTAIS</h3>
@@ -223,8 +329,8 @@
           </div>
         </section>
 
-        <!-- ── PAGE: Histórico ───────────────── -->
-        <section class="page" id="page-historico">
+        <!--  PAGE: Histórico  -->
+        <section class="page temp-module" id="page-historico">
           <div class="page-header">
             <h2>Histórico de Leituras</h2>
             <p>Análise temporal com filtros dinâmicos</p>
@@ -310,8 +416,8 @@
           </div>
         </section>
 
-        <!-- ── PAGE: Alertas ─────────────────── -->
-        <section class="page" id="page-alertas">
+        <!--  PAGE: Alertas  -->
+        <section class="page temp-module" id="page-alertas">
           <div class="page-header">
             <h2>Central de Alertas</h2>
             <p>Monitoramento de desvios conforme RDC50/ANVISA</p>
@@ -362,8 +468,8 @@
           </div>
         </section>
 
-        <!-- ── PAGE: Relatórios ──────────────── -->
-        <section class="page" id="page-relatorios">
+        <!--  PAGE: Relatórios  -->
+        <section class="page temp-module" id="page-relatorios">
           <div class="page-header">
             <h2>Geração de Relatórios</h2>
             <p>Relatórios institucionais conforme RDC50/ANVISA</p>
@@ -410,6 +516,283 @@
           </div>
         </section>
 
+        <section class="page energy-module energy-only" id="page-energia-solar">
+          <div class="page-header">
+            <h2>Energia Solar</h2>
+            <p>Geração fotovoltaica, sustentabilidade e performance por período</p>
+          </div>
+
+          <div class="card card-filters">
+            <div class="filters-row">
+              <div class="filter-group">
+                <label>Data Início</label>
+                <input type="date" id="energia-geracao-inicio" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Data Fim</label>
+                <input type="date" id="energia-geracao-fim" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Planta</label>
+                <select id="energia-geracao-planta" class="filter-select">
+                  <option value="">Todas as Plantas</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <button class="btn-primary" id="btn-energia-geracao-filtrar">Aplicar Filtros</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="energy-kpi-grid" id="energia-geracao-kpis"></div>
+
+          <div class="energy-layout">
+            <div class="card card-chart energy-chart-main">
+              <div class="card-header-row">
+                <h3 class="card-title">GERAÇÃO DIÁRIA (kWh)</h3>
+              </div>
+              <div class="chart-container chart-container-lg">
+                <canvas id="chart-energia-geracao"></canvas>
+              </div>
+            </div>
+            <div class="card energy-insights" id="energia-sustentabilidade"></div>
+          </div>
+
+          <div class="card card-table">
+            <div class="card-header-row">
+              <h3 class="card-title">DETALHAMENTO DA GERAÇÃO</h3>
+              <div class="table-info" id="energia-geracao-table-info">-- registros</div>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Planta</th>
+                    <th>Geração</th>
+                    <th>CO₂ Evitado</th>
+                  </tr>
+                </thead>
+                <tbody id="energia-geracao-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="page energy-module energy-only" id="page-rede-eletrica">
+          <div class="page-header">
+            <h2>Monitoramento de Energia em Tempo Real</h2>
+            <p>Painel estatístico operacional da rede elétrica e do grupo gerador.</p>
+          </div>
+
+          <div class="energy-kpi-grid" id="energia-iot-kpis"></div>
+          <div class="energy-phase-grid" id="energia-fases-atual"></div>
+
+          <div class="energy-layout energy-layout-monitor">
+            <div class="card card-chart energy-chart-main">
+              <div class="card-header-row">
+                <h3 class="card-title">TENSÃO FASE-NEUTRO — TEMPO REAL</h3>
+              </div>
+              <div class="chart-container chart-container-lg">
+                <canvas id="chart-energia-tensao"></canvas>
+              </div>
+            </div>
+            <div class="card energy-insights" id="energia-rede-insights"></div>
+          </div>
+        </section>
+
+        <!-- PAGE: Histórico Energia -->
+        <section class="page energy-module energy-only" id="page-historico-energia">
+          <div class="page-header">
+            <h2>Histórico de Energia</h2>
+            <p>Análise detalhada e histórico de leituras elétricas.</p>
+          </div>
+
+          <div class="card card-filters">
+            <div class="filters-row">
+              <div class="filter-group">
+                <label>Data Início</label>
+                <input type="datetime-local" id="energia-hist-inicio" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Data Fim</label>
+                <input type="datetime-local" id="energia-hist-fim" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Fornecedor</label>
+                <select id="energia-hist-fornecedor" class="filter-select">
+                  <option value="">Todos</option>
+                  <option value="CONCESSIONARIA">Concessionária</option>
+                  <option value="GERADOR">Gerador</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>Criticidade</label>
+                <select id="energia-hist-criticidade" class="filter-select">
+                  <option value="">Todas</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="MEDIA">Média</option>
+                  <option value="ALTA">Alta</option>
+                  <option value="CRITICA">Crítica</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <button class="btn-primary" id="btn-energia-hist-filtrar">Aplicar Filtros</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="energy-layout energy-layout-monitor" style="margin-bottom: var(--space-md);">
+            <div class="card card-chart">
+              <div class="card-header-row">
+                <h3 class="card-title">TENSÃO FASE-NEUTRO (V)</h3>
+              </div>
+              <div class="chart-container chart-container-lg">
+                <canvas id="chart-energia-hist-neutro"></canvas>
+              </div>
+            </div>
+            <div class="card card-chart">
+              <div class="card-header-row">
+                <h3 class="card-title">TENSÃO FASE-FASE (V)</h3>
+              </div>
+              <div class="chart-container chart-container-lg">
+                <canvas id="chart-energia-hist-fase"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-table">
+            <div class="card-header-row">
+              <h3 class="card-title">DETALHAMENTO DO HISTÓRICO ELÉTRICO</h3>
+              <div class="table-info" id="energia-hist-table-info">-- registros</div>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Data/Hora</th>
+                    <th>Status</th>
+                    <th>Criticidade</th>
+                    <th>Fornecedor</th>
+                    <th>V1</th>
+                    <th>V2</th>
+                    <th>V3</th>
+                    <th>V1&V2</th>
+                    <th>V2&V3</th>
+                    <th>V1&V3</th>
+                  </tr>
+                </thead>
+                <tbody id="energia-hist-table-body"></tbody>
+              </table>
+            </div>
+            <div class="table-pagination" id="energia-hist-table-pagination">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </section>
+
+        <section class="page energy-module energy-only" id="page-relatorio-energia">
+          <div class="page-header">
+            <h2>Relatórios e Análises de Energia</h2>
+            <p>Filtros, inconformidades, exportação PDF e análises detalhadas da rede elétrica e geração solar.</p>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title">CONFIGURAR RELATÓRIO ELÉTRICO</h3>
+            <div class="report-config">
+              <div class="filter-group">
+                <label>Tipo</label>
+                <select id="energia-report-tipo" class="filter-select">
+                  <option value="geracao">Geração Solar</option>
+                  <option value="rede">Rede Elétrica / IOT</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>Data Início</label>
+                <input type="date" id="energia-report-inicio" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Data Fim</label>
+                <input type="date" id="energia-report-fim" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <button class="btn-primary btn-lg" id="btn-energia-report-pdf">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  Gerar PDF de Energia
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-filters energy-history-filters">
+            <div class="card-header-row">
+              <h3 class="card-title">ANÁLISE HISTÓRICA DA REDE</h3>
+            </div>
+            <div class="filters-row">
+              <div class="filter-group">
+                <label>Data Início</label>
+                <input type="datetime-local" id="energia-iot-inicio" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Data Fim</label>
+                <input type="datetime-local" id="energia-iot-fim" class="filter-input">
+              </div>
+              <div class="filter-group">
+                <label>Fornecedor</label>
+                <select id="energia-iot-fornecedor" class="filter-select">
+                  <option value="">Todos</option>
+                  <option value="CONCESSIONARIA">Concessionária</option>
+                  <option value="GERADOR">Gerador</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>Criticidade</label>
+                <select id="energia-iot-criticidade" class="filter-select">
+                  <option value="">Todas</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="MEDIA">Média</option>
+                  <option value="ALTA">Alta</option>
+                  <option value="CRITICA">Crítica</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <button class="btn-primary" id="btn-energia-iot-filtrar">Aplicar Filtros</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-table">
+            <div class="card-header-row">
+              <h3 class="card-title">INCONFORMIDADES DA REDE</h3>
+              <div class="table-info" id="energia-inconformidades-info">-- registros</div>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Data/Hora</th>
+                    <th>Status</th>
+                    <th>Criticidade</th>
+                    <th>Fornecedor</th>
+                    <th>Fases</th>
+                    <th>Observação</th>
+                  </tr>
+                </thead>
+                <tbody id="energia-inconformidades-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title">REFERÊNCIAS OPERACIONAIS</h3>
+            <div class="energy-note-grid">
+              <div class="energy-note"><strong>Qualidade de tensão:</strong> fase-neutro monitorado com faixa operacional 202–231 V para nominal 220 V.</div>
+              <div class="energy-note"><strong>Fase-fase:</strong> estimativa calculada por pares V1&V2, V2&V3 e V1&V3 a partir das leituras fase-neutro.</div>
+              <div class="energy-note"><strong>Ambiente hospitalar:</strong> relatórios priorizam continuidade, rastreabilidade, alarmes e criticidade operacional.</div>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
 
@@ -434,12 +817,135 @@
     </nav>
   </div>
 
+  <!-- TV Rotation Settings Modal -->
+  <div id="tv-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card tv-modal-card">
+      <div class="modal-header">
+        <h3>Configurar Modo TV de Monitoramento</h3>
+        <button class="modal-close-btn" id="btn-close-tv-modal" type="button">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Selecione os painéis que deseja incluir na rotação automática e defina o intervalo de tempo.</p>
+        
+        <form id="tv-config-form" autocomplete="off">
+          <div class="tv-option-group">
+            <label class="tv-group-title">M&oacute;dulos para Rota&ccedil;&atilde;o:</label>
+
+            <label class="tv-checkbox-label">
+              <input type="checkbox" id="tv-rotate-hub" value="hub" data-tv-page>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Hub de M&oacute;dulos</strong>
+                <small>Tela inicial de separa&ccedil;&atilde;o dos m&oacute;dulos operacionais</small>
+              </div>
+            </label>
+            
+            <label class="tv-checkbox-label">
+              <input type="checkbox" id="tv-rotate-temp" value="visao-geral" data-tv-page checked>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Vis&atilde;o Geral (Temperatura e Umidade)</strong>
+                <small>Painel ambiental das salas em tempo real</small>
+              </div>
+            </label>
+
+            <label class="tv-checkbox-label">
+              <input type="checkbox" id="tv-rotate-historico" value="historico" data-tv-page>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Hist&oacute;rico (Temperatura e Umidade)</strong>
+                <small>Gr&aacute;ficos e tabelas hist&oacute;ricas de temperatura</small>
+              </div>
+            </label>
+
+            <label class="tv-checkbox-label">
+              <input type="checkbox" id="tv-rotate-alertas" value="alertas" data-tv-page>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Alertas (Temperatura e Umidade)</strong>
+                <small>Ocorr&ecirc;ncias e desvios normativos RDC50</small>
+              </div>
+            </label>
+
+            <label class="tv-checkbox-label">
+              <input type="checkbox" id="tv-rotate-relatorios" value="relatorios" data-tv-page>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Relat&oacute;rios de Temperatura</strong>
+                <small>Configura&ccedil;&atilde;o e pr&eacute;-visualiza&ccedil;&atilde;o de relat&oacute;rios ambientais</small>
+              </div>
+            </label>
+
+            <label class="tv-checkbox-label energy-only" id="tv-option-energy-mon">
+              <input type="checkbox" id="tv-rotate-energy-mon" value="rede-eletrica" data-tv-page checked>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Monitoramento de Energia (Real-Time)</strong>
+                <small>Status da rede el&eacute;trica e grupo gerador</small>
+              </div>
+            </label>
+
+            <label class="tv-checkbox-label energy-only" id="tv-option-energy-solar">
+              <input type="checkbox" id="tv-rotate-energy-solar" value="energia-solar" data-tv-page checked>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Gera&ccedil;&atilde;o Solar</strong>
+                <small>Estat&iacute;sticas de gera&ccedil;&atilde;o fotovoltaica</small>
+              </div>
+            </label>
+
+            <label class="tv-checkbox-label energy-only" id="tv-option-energy-history">
+              <input type="checkbox" id="tv-rotate-energy-history" value="historico-energia" data-tv-page>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Hist&oacute;rico de Energia</strong>
+                <small>Dispers&atilde;o de tens&atilde;o fase-neutro e fase-fase por per&iacute;odo</small>
+              </div>
+            </label>
+
+            <label class="tv-checkbox-label energy-only" id="tv-option-energy-report">
+              <input type="checkbox" id="tv-rotate-energy-report" value="relatorio-energia" data-tv-page>
+              <div class="checkbox-custom"></div>
+              <div class="option-text">
+                <strong>Relat&oacute;rios de Energia</strong>
+                <small>Filtros, inconformidades e exporta&ccedil;&otilde;es da rede el&eacute;trica</small>
+              </div>
+            </label>
+          </div>
+
+          <div class="tv-input-group">
+            <label for="tv-rotate-interval">Tempo de Transição (segundos):</label>
+            <input type="number" id="tv-rotate-interval" min="5" max="3600" value="30" required>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="btn-cancel-tv-modal">Cancelar</button>
+            <button type="submit" class="btn-primary" id="btn-start-tv-rotation">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Iniciar Monitoramento
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating TV Exit Button -->
+  <button id="tv-exit-btn" class="tv-exit-btn" style="display: none;" title="Sair do Modo Monitoramento (Esc)">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M18 6L6 18M6 6l12 12"/>
+    </svg>
+    <span>Sair do Modo Monitoramento</span>
+  </button>
+
   <!-- Scripts with cache busters -->
-  <script src="/js/charts.js?v=13"></script>
+  <script src="/js/charts.js?v=26"></script>
   <script src="/js/dashboard.js?v=13"></script>
   <script src="/js/historico.js?v=13"></script>
   <script src="/js/alertas.js?v=13"></script>
   <script src="/js/relatorio.js?v=13"></script>
-  <script src="/js/app.js?v=13"></script>
+  <script src="/js/energia.js?v=28"></script>
+  <script src="/js/energia-historico.js?v=28"></script>
+  <script src="/js/app.js?v=28"></script>
 </body>
 </html>

@@ -142,6 +142,7 @@ const NMCharts = {
         ctx.save();
         chart.data.datasets.slice(0, 2).forEach((dataset, datasetIndex) => {
           const meta = chart.getDatasetMeta(datasetIndex);
+          if (!meta || meta.hidden || !chart.isDatasetVisible(datasetIndex)) return;
           const points = meta.data;
           if (!points || !points.length) return;
 
@@ -177,6 +178,7 @@ const NMCharts = {
         ctx.save();
         chart.data.datasets.slice(0, 2).forEach((dataset, datasetIndex) => {
           const meta = chart.getDatasetMeta(datasetIndex);
+          if (!meta || meta.hidden || !chart.isDatasetVisible(datasetIndex)) return;
           if (!meta?.data?.length) return;
 
           const isTemp = dataset.label.toLowerCase().includes('temp');

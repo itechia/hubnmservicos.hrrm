@@ -51,6 +51,23 @@ const LIMITS = {
   umid: { min: +env.UMID_MIN || 40, max: +env.UMID_MAX || 70, target: +env.UMID_TARGET || 55 },
 };
 
+const ENERGY_LIMITS = {
+  faseNeutro: {
+    nominal: 220,
+    min: +env.ENERGIA_TENSAO_FN_MIN || 202,
+    max: +env.ENERGIA_TENSAO_FN_MAX || 231,
+  },
+  desequilibrioMaxPct: +env.ENERGIA_DESEQUILIBRIO_MAX || 5,
+  co2KgPorKwh: +env.ENERGIA_CO2_KG_KWH || 0.04,
+  arvoreKgCo2Ano: +env.ENERGIA_ARVORE_KG_CO2_ANO || 22,
+};
+
+ENERGY_LIMITS.faseFase = {
+  nominal: roundNumber(ENERGY_LIMITS.faseNeutro.nominal * Math.sqrt(3), 2),
+  min: roundNumber(ENERGY_LIMITS.faseNeutro.min * Math.sqrt(3), 2),
+  max: roundNumber(ENERGY_LIMITS.faseNeutro.max * Math.sqrt(3), 2),
+};
+
 // ── Stateless Token Authentication (JWT-like using native crypto) ──
 const JWT_SECRET = env.JWT_SECRET || 'default_secret_for_hrrm_dashboards_2026';
 
@@ -94,6 +111,31 @@ function requireAuth(req, res, next) {
   }
   req.user = user;
   next();
+}
+
+function requirePermission(...allowedPermissions) {
+  return (req, res, next) => {
+    const permission = normalizePermission(req.user?.permissao);
+    const login = normalizePermission(req.user?.login);
+    const allowed = new Set([
+      ...allowedPermissions.map(normalizePermission),
+      'hrrm',
+      'admin',
+      'administrador',
+      'master',
+      'total',
+    ]);
+
+    const hasExplicitAccess = allowed.has(permission);
+    const hasHrrmAccess = permission.includes('hrrm') || login.includes('hrrm');
+    const hasEnergyAccess = permission.includes('energia') || login.includes('energia');
+
+    if (!hasExplicitAccess && !hasHrrmAccess && !hasEnergyAccess) {
+      return res.status(403).json({ error: 'Acesso restrito à permissão energia_eletrica.' });
+    }
+
+    next();
+  };
 }
 
 // ── Express App ─────────────────────────────────────────────────
@@ -406,6 +448,233 @@ app.get('/api/temperatura/salas', requireAuth, async (req, res) => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ELECTRICAL ENERGY HUB
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+app.get('/api/energia/config', requireAuth, requirePermission('energia_eletrica'), (req, res) => {
+  res.json(ENERGY_LIMITS);
+});
+
+app.get('/api/energia/geracao/plantas', requireAuth, requirePermission('energia_eletrica'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT DISTINCT planta
+      FROM historico_geracao_energia
+      WHERE planta IS NOT NULL AND planta <> ''
+      ORDER BY planta
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching energy plants:', err);
+    res.status(500).json({ error: 'Erro ao buscar plantas de geração.' });
+  }
+});
+
+app.get('/api/energia/geracao/historico', requireAuth, requirePermission('energia_eletrica'), async (req, res) => {
+  try {
+    const { inicio, fim, planta, limit: queryLimit } = req.query;
+    let sql = `
+      SELECT data, energia, planta
+      FROM historico_geracao_energia
+      WHERE 1 = 1
+    `;
+    const params = [];
+
+    if (planta) { sql += ' AND planta = ?'; params.push(planta); }
+    if (inicio) { sql += ' AND data >= ?'; params.push(inicio); }
+    if (fim) { sql += ' AND data <= ?'; params.push(fim); }
+
+    sql += ' ORDER BY data DESC';
+    if (queryLimit) { sql += ' LIMIT ?'; params.push(parseInt(queryLimit)); }
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows.map(row => ({ ...row, energia: parseFloat(row.energia) })));
+  } catch (err) {
+    console.error('Error fetching generation history:', err);
+    res.status(500).json({ error: 'Erro ao buscar histórico de geração.' });
+  }
+});
+
+app.get('/api/energia/geracao/stats', requireAuth, requirePermission('energia_eletrica'), async (req, res) => {
+  try {
+    const { inicio, fim, planta } = req.query;
+    let whereClause = 'WHERE 1 = 1';
+    const params = [];
+
+    if (planta) { whereClause += ' AND planta = ?'; params.push(planta); }
+    if (inicio) { whereClause += ' AND data >= ?'; params.push(inicio); }
+    if (fim) { whereClause += ' AND data <= ?'; params.push(fim); }
+
+    const [statsRows] = await pool.query(`
+      SELECT
+        COUNT(*) AS dias_monitorados,
+        SUM(energia) AS total_kwh,
+        AVG(energia) AS media_kwh_dia,
+        MIN(energia) AS menor_kwh,
+        MAX(energia) AS maior_kwh,
+        MIN(data) AS data_inicio,
+        MAX(data) AS data_fim
+      FROM historico_geracao_energia
+      ${whereClause}
+    `, params);
+
+    const [bestRows] = await pool.query(`
+      SELECT data, energia, planta
+      FROM historico_geracao_energia
+      ${whereClause}
+      ORDER BY energia DESC, data DESC
+      LIMIT 1
+    `, params);
+
+    const [byPlantRows] = await pool.query(`
+      SELECT planta, COUNT(*) AS dias, SUM(energia) AS total_kwh, AVG(energia) AS media_kwh_dia
+      FROM historico_geracao_energia
+      ${whereClause}
+      GROUP BY planta
+      ORDER BY total_kwh DESC
+    `, params);
+
+    const stats = statsRows[0] || {};
+    const totalKwh = parseFloat(stats.total_kwh) || 0;
+    const co2EvitadoKg = roundNumber(totalKwh * ENERGY_LIMITS.co2KgPorKwh, 2);
+
+    res.json({
+      geral: {
+        ...stats,
+        total_kwh: totalKwh,
+        media_kwh_dia: parseFloat(stats.media_kwh_dia) || 0,
+        menor_kwh: parseFloat(stats.menor_kwh) || 0,
+        maior_kwh: parseFloat(stats.maior_kwh) || 0,
+        co2_evitado_kg: co2EvitadoKg,
+        arvores_equivalentes_ano: roundNumber(co2EvitadoKg / ENERGY_LIMITS.arvoreKgCo2Ano, 2),
+      },
+      melhor_dia: bestRows[0] ? { ...bestRows[0], energia: parseFloat(bestRows[0].energia) } : null,
+      por_planta: byPlantRows.map(row => ({
+        ...row,
+        total_kwh: parseFloat(row.total_kwh) || 0,
+        media_kwh_dia: parseFloat(row.media_kwh_dia) || 0,
+      })),
+      limites: ENERGY_LIMITS,
+    });
+  } catch (err) {
+    console.error('Error fetching generation stats:', err);
+    res.status(500).json({ error: 'Erro ao buscar estatísticas de geração.' });
+  }
+});
+
+app.get('/api/energia/iot/atual', requireAuth, requirePermission('energia_eletrica'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT *
+      FROM monitoramento_energia_iot
+      ORDER BY data_hora_registro DESC, id DESC
+      LIMIT 1
+    `);
+    res.json(rows[0] ? normalizeEnergyReading(rows[0]) : null);
+  } catch (err) {
+    console.error('Error fetching current energy IOT data:', err);
+    res.status(500).json({ error: 'Erro ao buscar monitoramento elétrico atual.' });
+  }
+});
+
+app.get('/api/energia/iot/historico', requireAuth, requirePermission('energia_eletrica'), async (req, res) => {
+  try {
+    const { inicio, fim, fornecedor, criticidade, status_rede, somente_alarmados, limit: queryLimit } = req.query;
+    const { whereClause, params } = buildEnergyIotWhere({ inicio, fim, fornecedor, criticidade, status_rede, somente_alarmados });
+    let sql = `
+      SELECT *
+      FROM monitoramento_energia_iot
+      ${whereClause}
+      ORDER BY data_hora_registro DESC, id DESC
+    `;
+
+    if (queryLimit) {
+      sql += ' LIMIT ?';
+      params.push(parseInt(queryLimit));
+    }
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows.map(normalizeEnergyReading));
+  } catch (err) {
+    console.error('Error fetching energy IOT history:', err);
+    res.status(500).json({ error: 'Erro ao buscar histórico elétrico.' });
+  }
+});
+
+app.get('/api/energia/iot/stats', requireAuth, requirePermission('energia_eletrica'), async (req, res) => {
+  try {
+    const { inicio, fim, fornecedor, criticidade, status_rede } = req.query;
+    const { whereClause, params } = buildEnergyIotWhere({ inicio, fim, fornecedor, criticidade, status_rede });
+
+    const [statsRows] = await pool.query(`
+      SELECT
+        COUNT(*) AS total_leituras,
+        SUM(alarme_ativo = 'SIM') AS total_alarmes,
+        SUM(leitura_valida = 'INVALIDA') AS leituras_invalidas,
+        SUM(fornecedor_energia = 'CONCESSIONARIA') AS leituras_concessionaria,
+        SUM(fornecedor_energia = 'GERADOR') AS leituras_gerador,
+        AVG(v1_tensao_v) AS v1_avg,
+        AVG(v2_tensao_v) AS v2_avg,
+        AVG(v3_tensao_v) AS v3_avg,
+        MIN(LEAST(v1_tensao_v, v2_tensao_v, v3_tensao_v)) AS menor_tensao_fn,
+        MAX(GREATEST(v1_tensao_v, v2_tensao_v, v3_tensao_v)) AS maior_tensao_fn,
+        AVG(tensao_media_fase_neutro_v) AS media_fn,
+        AVG(tensao_rede_linha_linha_estimado_v) AS media_ff,
+        AVG(desequilibrio_percentual) AS desequilibrio_avg,
+        MAX(desequilibrio_percentual) AS desequilibrio_max,
+        MIN(data_hora_registro) AS data_inicio,
+        MAX(data_hora_registro) AS data_fim
+      FROM monitoramento_energia_iot
+      ${whereClause}
+    `, params);
+
+    const [statusRows] = await pool.query(`
+      SELECT status_rede, criticidade, fornecedor_energia, COUNT(*) AS total
+      FROM monitoramento_energia_iot
+      ${whereClause}
+      GROUP BY status_rede, criticidade, fornecedor_energia
+      ORDER BY total DESC
+    `, params);
+
+    res.json({
+      geral: normalizeEnergyStats(statsRows[0] || {}),
+      distribuicao: statusRows,
+      limites: ENERGY_LIMITS,
+    });
+  } catch (err) {
+    console.error('Error fetching energy IOT stats:', err);
+    res.status(500).json({ error: 'Erro ao buscar estatísticas elétricas.' });
+  }
+});
+
+app.get('/api/energia/iot/inconformidades', requireAuth, requirePermission('energia_eletrica'), async (req, res) => {
+  try {
+    const { inicio, fim, fornecedor, criticidade, status_rede, limit: queryLimit } = req.query;
+    const { whereClause, params } = buildEnergyIotWhere({
+      inicio,
+      fim,
+      fornecedor,
+      criticidade,
+      status_rede,
+      somente_alarmados: 'true',
+    });
+
+    const [rows] = await pool.query(`
+      SELECT *
+      FROM monitoramento_energia_iot
+      ${whereClause}
+      ORDER BY data_hora_registro DESC, id DESC
+      LIMIT ?
+    `, [...params, parseInt(queryLimit) || 100]);
+
+    res.json(rows.map(normalizeEnergyReading));
+  } catch (err) {
+    console.error('Error fetching energy nonconformities:', err);
+    res.status(500).json({ error: 'Erro ao buscar inconformidades elétricas.' });
+  }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PDF REPORT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -602,6 +871,115 @@ app.post('/api/relatorio/pdf', requireAuth, async (req, res) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // HELPERS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function roundNumber(value, decimals = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Number(number.toFixed(decimals));
+}
+
+function normalizePermission(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+}
+
+function parseNullableNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function calcLineLineVoltage(a, b) {
+  const va = parseNullableNumber(a);
+  const vb = parseNullableNumber(b);
+  if (!Number.isFinite(va) || !Number.isFinite(vb)) return null;
+  return roundNumber(Math.sqrt((va ** 2) + (vb ** 2) + (va * vb)), 2);
+}
+
+function classifyVoltage(value, limits = ENERGY_LIMITS.faseNeutro) {
+  const voltage = parseNullableNumber(value);
+  if (!Number.isFinite(voltage)) return 'sem_leitura';
+  if (voltage < limits.min || voltage > limits.max) return 'critico';
+
+  const lowerAttention = limits.min + ((limits.nominal - limits.min) * 0.2);
+  const upperAttention = limits.max - ((limits.max - limits.nominal) * 0.2);
+  if (voltage <= lowerAttention || voltage >= upperAttention) return 'atencao';
+
+  return 'normal';
+}
+
+function normalizeEnergyReading(row) {
+  const v1 = parseNullableNumber(row.v1_tensao_v);
+  const v2 = parseNullableNumber(row.v2_tensao_v);
+  const v3 = parseNullableNumber(row.v3_tensao_v);
+  const v12 = calcLineLineVoltage(v1, v2);
+  const v23 = calcLineLineVoltage(v2, v3);
+  const v13 = calcLineLineVoltage(v1, v3);
+
+  return {
+    ...row,
+    v1_tensao_v: v1,
+    v2_tensao_v: v2,
+    v3_tensao_v: v3,
+    tensao_media_fase_neutro_v: parseNullableNumber(row.tensao_media_fase_neutro_v),
+    tensao_rede_linha_linha_estimado_v: parseNullableNumber(row.tensao_rede_linha_linha_estimado_v),
+    desequilibrio_percentual: parseNullableNumber(row.desequilibrio_percentual),
+    v12_tensao_v: v12,
+    v23_tensao_v: v23,
+    v13_tensao_v: v13,
+    v1_status_normativo: classifyVoltage(v1),
+    v2_status_normativo: classifyVoltage(v2),
+    v3_status_normativo: classifyVoltage(v3),
+    v12_status_normativo: classifyVoltage(v12, ENERGY_LIMITS.faseFase),
+    v23_status_normativo: classifyVoltage(v23, ENERGY_LIMITS.faseFase),
+    v13_status_normativo: classifyVoltage(v13, ENERGY_LIMITS.faseFase),
+  };
+}
+
+function normalizeEnergyStats(stats) {
+  const total = Number(stats.total_leituras) || 0;
+  const concessionaria = Number(stats.leituras_concessionaria) || 0;
+  const gerador = Number(stats.leituras_gerador) || 0;
+
+  return {
+    ...stats,
+    total_leituras: total,
+    total_alarmes: Number(stats.total_alarmes) || 0,
+    leituras_invalidas: Number(stats.leituras_invalidas) || 0,
+    leituras_concessionaria: concessionaria,
+    leituras_gerador: gerador,
+    concessionaria_pct: total ? roundNumber((concessionaria / total) * 100, 1) : 0,
+    gerador_pct: total ? roundNumber((gerador / total) * 100, 1) : 0,
+    v1_avg: parseNullableNumber(stats.v1_avg),
+    v2_avg: parseNullableNumber(stats.v2_avg),
+    v3_avg: parseNullableNumber(stats.v3_avg),
+    menor_tensao_fn: parseNullableNumber(stats.menor_tensao_fn),
+    maior_tensao_fn: parseNullableNumber(stats.maior_tensao_fn),
+    media_fn: parseNullableNumber(stats.media_fn),
+    media_ff: parseNullableNumber(stats.media_ff),
+    desequilibrio_avg: parseNullableNumber(stats.desequilibrio_avg),
+    desequilibrio_max: parseNullableNumber(stats.desequilibrio_max),
+  };
+}
+
+function buildEnergyIotWhere(filters = {}) {
+  let whereClause = 'WHERE 1 = 1';
+  const params = [];
+
+  if (filters.inicio) { whereClause += ' AND data_hora_registro >= ?'; params.push(filters.inicio); }
+  if (filters.fim) { whereClause += ' AND data_hora_registro <= ?'; params.push(filters.fim); }
+  if (filters.fornecedor) { whereClause += ' AND fornecedor_energia = ?'; params.push(filters.fornecedor); }
+  if (filters.criticidade) { whereClause += ' AND criticidade = ?'; params.push(filters.criticidade); }
+  if (filters.status_rede) { whereClause += ' AND status_rede = ?'; params.push(filters.status_rede); }
+  if (filters.somente_alarmados === 'true' || filters.somente_alarmados === true) {
+    whereClause += " AND (alarme_ativo = 'SIM' OR leitura_valida = 'INVALIDA' OR status_rede <> 'NORMAL')";
+  }
+
+  return { whereClause, params };
+}
 
 function classifyValue(value, limits) {
   if (value < limits.min || value > limits.max) return 'critico';

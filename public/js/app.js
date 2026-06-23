@@ -33,7 +33,11 @@ const API = {
 // ── Main App ────────────────────────────────
 const App = {
   refreshInterval: null,
-  currentPage: 'visao-geral',
+  currentPage: 'hub',
+  currentUser: null,
+  tvRotationInterval: null,
+  tvRotationPages: [],
+  tvRotationPageIndex: 0,
 
   async init() {
     // Check stored session
@@ -53,13 +57,13 @@ const App = {
     this.setupLoginForm();
     this.setupNavigation();
     this.setupSidebarToggle();
+    this.setupTvMode();
     this.startClock();
   },
 
-  // ── Theme & TV Mode Toggles ──────────────
+  // ── Theme Toggle ─────────────────────────
   setupToggles() {
     const themeBtn = document.getElementById('theme-toggle-btn');
-    const tvBtn = document.getElementById('tv-toggle-btn');
 
     // Load saved preferences
     const savedTheme = localStorage.getItem('hrrm_theme') || 'dark';
@@ -69,13 +73,6 @@ const App = {
       document.body.classList.remove('dark-mode');
     }
     this.updateBrandLogo(savedTheme === 'dark');
-
-    const savedTv = localStorage.getItem('hrrm_tv') === 'true';
-    if (savedTv) {
-      document.body.classList.add('tv-mode');
-    } else {
-      document.body.classList.remove('tv-mode');
-    }
 
     themeBtn?.addEventListener('click', () => {
       const isDark = document.body.classList.toggle('dark-mode');
@@ -88,11 +85,6 @@ const App = {
       } else if (this.currentPage === 'historico') {
         Historico.applyFilters();
       }
-    });
-
-    tvBtn?.addEventListener('click', () => {
-      const isTv = document.body.classList.toggle('tv-mode');
-      localStorage.setItem('hrrm_tv', isTv ? 'true' : 'false');
     });
   },
 
@@ -160,6 +152,7 @@ const App = {
   },
 
   async showDashboard(user) {
+    this.currentUser = user;
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
 
@@ -170,17 +163,78 @@ const App = {
     // Logout button
     document.getElementById('logout-btn')?.addEventListener('click', () => this.logout());
 
-    // Initialize modules
-    await Dashboard.init();
-    await Historico.init();
+    // 1. Immediately apply permissions and navigate to set the correct layout (e.g. hide sidebar on Hub)
+    this.applyPermissions(user);
+    const initialPage = location.hash.replace('#', '') || 'hub';
+    this.navigateTo(initialPage);
+
+    // 2. Initialize modules in the background to prevent blocking the UI layout
     this.setupCentroCustoFilter();
-    await Alertas.init();
     Relatorio.init();
 
-    // Auto-refresh every 60 seconds
+    Promise.all([
+      Dashboard.init().catch(e => console.error('Dashboard init error:', e)),
+      Historico.init().catch(e => console.error('Historico init error:', e)),
+      Alertas.init().catch(e => console.error('Alertas init error:', e)),
+      Energia.init().catch(e => console.error('Energia init error:', e)),
+      EnergiaHistorico.init().catch(e => console.error('EnergiaHistorico init error:', e))
+    ]);
+
+    this.lastRefresh = {
+      temperature: Date.now(),
+      energySolar: Date.now(),
+      energyRede: Date.now()
+    };
+
+    // Auto-refresh checker (runs every 5 seconds)
     this.refreshInterval = setInterval(async () => {
-      await Dashboard.refresh();
-    }, 60000);
+      const now = Date.now();
+
+      if (['visao-geral', 'historico', 'alertas', 'relatorios'].includes(this.currentPage)) {
+        // Temperature refresh: every 30 minutes
+        if (now - this.lastRefresh.temperature >= 30 * 60 * 1000) {
+          this.lastRefresh.temperature = now;
+          await Dashboard.refresh();
+        }
+      } else if (this.currentPage === 'rede-eletrica') {
+        // Real-time energy refresh: every 30 seconds
+        if (now - this.lastRefresh.energyRede >= 30 * 1000) {
+          this.lastRefresh.energyRede = now;
+          await Energia.refreshRede({ filtered: false });
+        }
+      } else if (this.currentPage === 'energia-solar') {
+        // Solar energy refresh: once a day (every 24 hours)
+        if (now - this.lastRefresh.energySolar >= 24 * 60 * 60 * 1000) {
+          this.lastRefresh.energySolar = now;
+          await Energia.refreshGeracao();
+        }
+      }
+    }, 5000);
+  },
+
+  hasEnergyPermission(user) {
+    const normalize = (value) => String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_');
+    const permission = normalize(user?.permissao);
+    const login = normalize(user?.login);
+
+    return ['energia_eletrica', 'hrrm', 'admin', 'administrador', 'master', 'total'].includes(permission)
+      || permission.includes('hrrm')
+      || permission.includes('energia')
+      || login.includes('hrrm')
+      || login.includes('energia');
+  },
+
+  applyPermissions(user) {
+    const hasEnergy = this.hasEnergyPermission(user);
+    document.querySelectorAll('.energy-only').forEach(element => {
+      element.style.display = hasEnergy ? '' : 'none';
+      element.dataset.authorized = hasEnergy ? 'true' : 'false';
+    });
   },
 
   getCentroCustoFilter() {
@@ -247,6 +301,7 @@ const App = {
     localStorage.removeItem('hrrm_token');
     localStorage.removeItem('hrrm_user');
     API.token = null;
+    this.currentUser = null;
 
     if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.showLogin();
@@ -260,6 +315,12 @@ const App = {
         e.preventDefault();
         const page = link.dataset.page;
         this.navigateTo(page);
+      });
+    });
+
+    document.querySelectorAll('[data-module-target]').forEach(card => {
+      card.addEventListener('click', () => {
+        this.navigateTo(card.dataset.moduleTarget);
       });
     });
 
@@ -280,7 +341,15 @@ const App = {
   },
 
   navigateTo(page) {
+    if (!document.getElementById(`page-${page}`)) {
+      page = 'hub';
+    }
+    if (this.getPageModule(page) === 'energy' && !this.hasEnergyPermission(this.currentUser)) {
+      page = 'hub';
+    }
+
     this.currentPage = page;
+    this.updateModuleNavigation(page);
 
     // Update sidebar active state
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -295,11 +364,28 @@ const App = {
     const pageEl = document.getElementById(`page-${page}`);
     if (pageEl) pageEl.classList.add('active');
 
-    // Load data for specific pages
-    if (page === 'historico') {
-      Historico.applyFilters();
-    } else if (page === 'alertas') {
-      Alertas.refresh();
+    // Load data for specific pages and update timestamps for background scheduler
+    if (['visao-geral', 'historico', 'alertas', 'relatorios'].includes(page)) {
+      if (this.lastRefresh) this.lastRefresh.temperature = Date.now();
+      if (page === 'visao-geral') {
+        Dashboard.refresh();
+      } else if (page === 'historico') {
+        Historico.applyFilters();
+      } else if (page === 'alertas') {
+        Alertas.refresh();
+      }
+    } else if (page === 'energia-solar') {
+      if (this.lastRefresh) this.lastRefresh.energySolar = Date.now();
+      Energia.refreshGeracao();
+    } else if (page === 'rede-eletrica') {
+      if (this.lastRefresh) this.lastRefresh.energyRede = Date.now();
+      Energia.refreshRede({ filtered: false });
+    } else if (page === 'relatorio-energia') {
+      if (this.lastRefresh) this.lastRefresh.energyRede = Date.now();
+      Energia.refreshRede({ filtered: true });
+    } else if (page === 'historico-energia') {
+      if (this.lastRefresh) this.lastRefresh.energyRede = Date.now();
+      EnergiaHistorico.applyFilters();
     }
 
     // Close sidebar on mobile
@@ -307,6 +393,52 @@ const App = {
 
     // Update hash
     history.replaceState(null, '', `#${page}`);
+  },
+
+  getPageModule(page) {
+    if (page === 'hub') return 'hub';
+    if (['energia-solar', 'rede-eletrica', 'relatorio-energia', 'historico-energia'].includes(page)) return 'energy';
+    return 'temperature';
+  },
+
+  updateModuleNavigation(page) {
+    const module = this.getPageModule(page);
+    document.body.dataset.module = module;
+
+    document.querySelectorAll('.sidebar-nav .temp-module').forEach(item => {
+      item.style.display = module === 'temperature' ? '' : 'none';
+    });
+    document.querySelectorAll('.sidebar-nav .energy-module').forEach(item => {
+      item.style.display = module === 'energy' ? '' : 'none';
+    });
+
+    const sidebarSummary = document.getElementById('sidebar-summary');
+    if (sidebarSummary) {
+      sidebarSummary.style.display = module === 'temperature' ? '' : 'none';
+    }
+
+    const brandModule = document.querySelector('.brand-module');
+    if (brandModule) {
+      brandModule.textContent = module === 'energy'
+        ? 'Controle de Energia'
+        : module === 'temperature'
+          ? 'Controle de Temperatura'
+          : 'Hub de Monitoramento';
+    }
+
+    const statusItems = document.querySelectorAll('.header-status .status-item');
+    if (statusItems[0]) {
+      statusItems[0].querySelector('.status-label').textContent = module === 'energy' ? 'ENERGIA' : 'SISTEMA';
+      statusItems[0].querySelector('.status-value').textContent = 'ATIVO';
+    }
+    if (statusItems[1]) {
+      statusItems[1].querySelector('.status-label').textContent = module === 'energy' ? 'M\u00d3DULO' : 'MODO';
+      statusItems[1].querySelector('.status-value').textContent = module === 'energy' ? 'MONITORAMENTO' : 'AUTOM\u00c1TICO';
+    }
+    const centerFilter = document.getElementById('status-centro-custo');
+    if (centerFilter) {
+      centerFilter.style.display = module === 'temperature' ? '' : 'none';
+    }
   },
 
   // ── Sidebar Toggle (Mobile) ──────────────
@@ -335,12 +467,172 @@ const App = {
     });
   },
 
+  // ── TV Mode & Rotation State Management ──
+  setupTvMode() {
+    const tvBtn = document.getElementById('tv-toggle-btn');
+    const modal = document.getElementById('tv-modal');
+    const closeBtn = document.getElementById('btn-close-tv-modal');
+    const cancelBtn = document.getElementById('btn-cancel-tv-modal');
+    const form = document.getElementById('tv-config-form');
+    const exitBtn = document.getElementById('tv-exit-btn');
+
+    if (!tvBtn || !modal) return;
+
+    const openModal = () => {
+      const hasEnergy = this.hasEnergyPermission(this.currentUser);
+      document.querySelectorAll('#tv-modal .energy-only').forEach(option => {
+        option.style.display = hasEnergy ? '' : 'none';
+      });
+
+      const savedInterval = localStorage.getItem('hrrm_tv_interval') || '30';
+      const intervalInput = document.getElementById('tv-rotate-interval');
+      if (intervalInput) intervalInput.value = savedInterval;
+
+      modal.style.display = 'flex';
+    };
+
+    const closeModal = () => {
+      modal.style.display = 'none';
+    };
+
+    tvBtn.addEventListener('click', () => {
+      if (this.currentPage === 'hub') {
+        openModal();
+        return;
+      }
+
+      const savedInterval = parseInt(localStorage.getItem('hrrm_tv_interval'), 10) || 30;
+      this.startTvRotation([this.currentPage], savedInterval);
+    });
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      closeModal();
+
+      const hasEnergy = this.hasEnergyPermission(this.currentUser);
+      const pages = [...document.querySelectorAll('#tv-modal input[data-tv-page]:checked')]
+        .map(input => input.value)
+        .filter(page => hasEnergy || this.getPageModule(page) !== 'energy');
+
+      if (pages.length === 0) {
+        alert('Selecione pelo menos um m\u00f3dulo para rota\u00e7\u00e3o.');
+        return;
+      }
+
+      const intervalInput = document.getElementById('tv-rotate-interval');
+      const seconds = parseInt(intervalInput?.value) || 30;
+      localStorage.setItem('hrrm_tv_interval', seconds.toString());
+
+      this.startTvRotation(pages, seconds);
+    });
+
+    exitBtn?.addEventListener('click', () => {
+      this.stopTvRotation();
+    });
+
+    const onFullscreenChange = () => {
+      const isFullscreen = document.fullscreenElement ||
+                           document.webkitFullscreenElement ||
+                           document.mozFullScreenElement ||
+                           document.msFullscreenElement;
+
+      if (!isFullscreen && document.body.classList.contains('tv-mode')) {
+        this.stopTvRotation();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('mozfullscreenchange', onFullscreenChange);
+    document.addEventListener('MSFullscreenChange', onFullscreenChange);
+  },
+
+  startTvRotation(pages, intervalSecs) {
+    this.stopTvRotation(); // Ensure clean state
+
+    this.tvRotationPages = pages;
+    this.tvRotationPageIndex = 0;
+
+    // Apply tv-mode class
+    document.body.classList.add('tv-mode');
+    
+    // Show exit button
+    const exitBtn = document.getElementById('tv-exit-btn');
+    if (exitBtn) exitBtn.style.display = 'flex';
+
+    // Request fullscreen safely
+    const docEl = document.documentElement;
+    try {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen();
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.mozRequestFullScreen) {
+        docEl.mozRequestFullScreen();
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+      }
+    } catch (err) {
+      console.warn('Fullscreen API is blocked or not supported on this browser (TBrowser fallback).');
+    }
+
+    // Immediately navigate to first page
+    this.navigateTo(this.tvRotationPages[0]);
+
+    // Setup transition interval
+    if (this.tvRotationPages.length > 1) {
+      this.tvRotationInterval = setInterval(() => {
+        this.tvRotationPageIndex = (this.tvRotationPageIndex + 1) % this.tvRotationPages.length;
+        const nextPage = this.tvRotationPages[this.tvRotationPageIndex];
+        this.navigateTo(nextPage);
+      }, intervalSecs * 1000);
+    }
+  },
+
+  stopTvRotation() {
+    // Clear timer
+    if (this.tvRotationInterval) {
+      clearInterval(this.tvRotationInterval);
+      this.tvRotationInterval = null;
+    }
+    this.tvRotationPages = [];
+    this.tvRotationPageIndex = 0;
+
+    // Remove tv-mode class
+    document.body.classList.remove('tv-mode');
+
+    // Hide exit button
+    const exitBtn = document.getElementById('tv-exit-btn');
+    if (exitBtn) exitBtn.style.display = 'none';
+
+    // Exit fullscreen safely
+    try {
+      if (document.exitFullscreen) {
+        if (document.fullscreenElement) document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        if (document.webkitFullscreenElement) document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        if (document.mozFullScreenElement) document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        if (document.msFullscreenElement) document.msExitFullscreen();
+      }
+    } catch (err) {
+      console.warn('Error exiting fullscreen:', err);
+    }
+
+    // Refresh current page to apply normal layout size
+    this.navigateTo(this.currentPage || 'hub');
+  },
+
   // ── Clock ────────────────────────────────
   startClock() {
     const update = () => {
       const now = new Date();
       const clockEl = document.getElementById('header-clock');
       const dateEl = document.getElementById('header-date');
+      const hubLastUpdateEl = document.getElementById('hub-last-update');
 
       if (clockEl) {
         clockEl.textContent = now.toLocaleTimeString('pt-BR', {
@@ -351,6 +643,12 @@ const App = {
       if (dateEl) {
         dateEl.textContent = now.toLocaleDateString('pt-BR', {
           day: '2-digit', month: '2-digit', year: 'numeric',
+        });
+      }
+
+      if (hubLastUpdateEl) {
+        hubLastUpdateEl.textContent = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
         });
       }
     };

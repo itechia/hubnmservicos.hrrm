@@ -47,16 +47,24 @@ const Relatorio = {
         throw new Error('Biblioteca PDFLib não carregada.');
       }
 
-      const { PDFDocument, StandardFonts, rgb } = PDFLib;
+      const { PDFDocument, rgb } = PDFLib;
       const pdfDoc = await PDFDocument.create();
+      
+      // Register fontkit
+      pdfDoc.registerFontkit(window.fontkit);
+      
+      // Load Arial and Arial Bold fonts locally
+      const [arialBytes, arialBoldBytes] = await Promise.all([
+        fetch('/arial.ttf').then(res => res.arrayBuffer()),
+        fetch('/arialbd.ttf').then(res => res.arrayBuffer()),
+      ]);
+      
+      const fontRegular = await pdfDoc.embedFont(arialBytes);
+      const fontBold = await pdfDoc.embedFont(arialBoldBytes);
       
       // Page size A4 (595.28 x 841.89 points)
       let page = pdfDoc.addPage([595.28, 841.89]);
       const { width, height } = page.getSize();
-      
-      // Helper function to draw text
-      const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
       // Colors matching NM Serviços Guidelines
       const colorNMBlue = rgb(11/255, 35/255, 92/255);      // #0B235C
