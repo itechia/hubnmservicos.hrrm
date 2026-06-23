@@ -189,7 +189,9 @@ app.post('/api/login', async (req, res) => {
     for (const line of lines) {
       const parts = line.split(',').map(p => p.trim().replace(/\r/g, ''));
       if (parts.length >= 3) {
-        const [csvLogin, csvSenha, csvPermissao] = parts;
+        const csvLogin = parts[0];
+        const csvSenha = parts[1];
+        const csvPermissao = parts.slice(2).join(', ').replace(/^"|"$/g, '').trim();
         if (csvLogin === login && csvSenha === senha) {
           foundUser = { login: csvLogin, permissao: csvPermissao };
           break;
