@@ -4202,3 +4202,101 @@ body.tv-mode .conditions-indicators {
   padding-top: 12px !important;
 }
 
+/* TV 720p/50" monitor fit: keep indicators visible without chart overlap */
+@media (max-height: 820px) {
+  body.tv-mode #page-visao-geral.active {
+    grid-template-rows: 230px minmax(0, 1fr) 50px !important;
+    gap: 8px !important;
+  }
+
+  body.tv-mode #card-conditions {
+    height: 230px !important;
+    padding: 9px 12px !important;
+  }
+
+  body.tv-mode #card-conditions .card-title {
+    margin-bottom: 8px !important;
+  }
+
+  body.tv-mode .conditions-grid {
+    grid-template-columns: minmax(0, 1fr) 104px minmax(0, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  body.tv-mode .condition-readout,
+  body.tv-mode .condition-humidity-center {
+    min-height: 88px !important;
+    padding: 8px 10px !important;
+  }
+
+  body.tv-mode .condition-humidity-center {
+    gap: 4px !important;
+  }
+
+  body.tv-mode .condition-humidity-center .condition-gauge {
+    width: 78px !important;
+    height: 78px !important;
+  }
+
+  body.tv-mode .condition-humidity-center .condition-value .big-number {
+    font-size: 1.18rem !important;
+  }
+
+  body.tv-mode .condition-humidity-center .condition-value .unit {
+    font-size: 0.58rem !important;
+    margin-top: 0 !important;
+  }
+
+  body.tv-mode .condition-humidity-center > .condition-label {
+    max-width: 104px !important;
+    font-size: 0.55rem !important;
+    line-height: 1.05 !important;
+  }
+
+  body.tv-mode .condition-label,
+  body.tv-mode .indicator-label {
+    font-size: 0.55rem !important;
+    letter-spacing: 0.7px !important;
+  }
+
+  body.tv-mode .condition-sub {
+    font-size: 0.55rem !important;
+    line-height: 1.2 !important;
+  }
+
+  body.tv-mode .readout-value {
+    font-size: 1.45rem !important;
+  }
+
+  body.tv-mode .readout-value span {
+    font-size: 0.82rem !important;
+  }
+
+  body.tv-mode .conditions-indicators {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+  }
+
+  body.tv-mode .indicator-item {
+    min-height: 34px !important;
+    padding: 5px 8px !important;
+    grid-template-columns: 22px minmax(0, 1fr) !important;
+  }
+
+  body.tv-mode .indicator-icon {
+    font-size: 1rem !important;
+  }
+
+  body.tv-mode .indicator-value {
+    font-size: 0.72rem !important;
+    line-height: 1.05 !important;
+  }
+
+  body.tv-mode #card-chart-24h {
+    height: 100% !important;
+  }
+}
+
