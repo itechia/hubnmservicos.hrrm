@@ -51,7 +51,14 @@ const pool = mysql.createPool({
 const LIMITS = {
   temp: { min: +env.TEMP_MIN || 15, max: +env.TEMP_MAX || 30, target: +env.TEMP_TARGET || 22 },
   umid: { min: +env.UMID_MIN || 40, max: +env.UMID_MAX || 70, target: +env.UMID_TARGET || 55 },
+  setor: 'PADRAO',
+  norma: 'RDC50 / ANVISA',
+  descricao: 'Area de Armazenamento Hospitalar',
 };
+
+const LIMITS_CSV_URL = env.LIMITES_SETORES_CSV_URL || env.SECTORS_LIMITS_CSV_URL || '';
+const LIMITS_CACHE_MS = 5 * 60 * 1000;
+let limitsCache = { loadedAt: 0, bySector: new Map() };
 
 const ENERGY_LIMITS = {
   faseNeutro: {
@@ -69,6 +76,8 @@ ENERGY_LIMITS.faseFase = {
   min: roundNumber(ENERGY_LIMITS.faseNeutro.min * Math.sqrt(3), 2),
   max: roundNumber(ENERGY_LIMITS.faseNeutro.max * Math.sqrt(3), 2),
 };
+
+const HUMIDITY_SQL = 'CASE WHEN umidade_pct > 100 AND umidade_pct <= 1000 THEN umidade_pct / 10 ELSE umidade_pct END';
 
 // ── Stateless Token Authentication (JWT-like using native crypto) ──
 const JWT_SECRET = env.JWT_SECRET || 'default_secret_for_hrrm_dashboards_2026';
@@ -220,8 +229,13 @@ app.post('/api/logout', (req, res) => {
 // CONFIG / LIMITS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-app.get('/api/config/limites', requireAuth, (req, res) => {
-  res.json(LIMITS);
+app.get('/api/config/limites', requireAuth, async (req, res) => {
+  try {
+    res.json(await getLimitsForSector(req.query.centro_custo));
+  } catch (err) {
+    console.error('Error fetching configured limits:', err);
+    res.json(LIMITS);
+  }
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -232,8 +246,8 @@ app.get('/api/config/limites', requireAuth, (req, res) => {
 app.get('/api/temperatura/atual', requireAuth, async (req, res) => {
   try {
     const { centro_custo } = req.query;
-    let subWhere = "codigo_sala IS NOT NULL AND online = 'Sim'";
-    let outerWhere = "t1.online = 'Sim'";
+    let subWhere = 'codigo_sala IS NOT NULL';
+    let outerWhere = '1 = 1';
     const params = [];
 
     if (centro_custo) {
@@ -255,12 +269,17 @@ app.get('/api/temperatura/atual', requireAuth, async (req, res) => {
       ORDER BY t1.sala
     `, params);
 
-    // Add status classification based on RDC50 limits
-    const enriched = rows.map(r => ({
-      ...r,
-      temperatura_c: parseFloat(r.temperatura_c),
-      temp_status: classifyValue(parseFloat(r.temperatura_c), LIMITS.temp),
-      umid_status: classifyValue(r.umidade_pct, LIMITS.umid),
+    // Add status classification based on configured limits for each sector
+    const enriched = await Promise.all(rows.map(async (r) => {
+      const limits = await getLimitsForSector(r.centro_custo);
+      return {
+        ...r,
+        temperatura_c: parseFloat(r.temperatura_c),
+        umidade_pct: normalizeHumidity(r.umidade_pct),
+        temp_status: classifyValue(parseFloat(r.temperatura_c), limits.temp),
+        umid_status: classifyValue(normalizeHumidity(r.umidade_pct), limits.umid),
+        limites: limits,
+      };
     }));
 
     res.json(enriched);
@@ -311,7 +330,7 @@ app.get('/api/temperatura/historico', requireAuth, async (req, res) => {
     }
 
     const [rows] = await pool.query(sql, params);
-    res.json(rows.map(r => ({ ...r, temperatura_c: parseFloat(r.temperatura_c) })));
+    res.json(rows.map(normalizeTemperatureReading));
   } catch (err) {
     console.error('Error fetching history:', err);
     res.status(500).json({ error: 'Erro ao buscar histórico.' });
@@ -331,14 +350,16 @@ app.get('/api/temperatura/stats', requireAuth, async (req, res) => {
     if (inicio) { whereClause += ' AND criado_em >= ?'; params.push(inicio); }
     if (fim) { whereClause += ' AND criado_em <= ?'; params.push(fim); }
 
+    const limits = await getLimitsForSector(centro_custo);
+
     const [stats] = await pool.query(`
       SELECT
         MIN(temperatura_c) AS temp_min,
         MAX(temperatura_c) AS temp_max,
         AVG(temperatura_c) AS temp_avg,
-        MIN(umidade_pct) AS umid_min,
-        MAX(umidade_pct) AS umid_max,
-        AVG(umidade_pct) AS umid_avg,
+        MIN(${HUMIDITY_SQL}) AS umid_min,
+        MAX(${HUMIDITY_SQL}) AS umid_max,
+        AVG(${HUMIDITY_SQL}) AS umid_avg,
         COUNT(*) AS total_leituras
       FROM controle_de_temperatura
       ${whereClause}
@@ -350,9 +371,9 @@ app.get('/api/temperatura/stats', requireAuth, async (req, res) => {
         MIN(temperatura_c) AS temp_min,
         MAX(temperatura_c) AS temp_max,
         AVG(temperatura_c) AS temp_avg,
-        MIN(umidade_pct) AS umid_min,
-        MAX(umidade_pct) AS umid_max,
-        AVG(umidade_pct) AS umid_avg,
+        MIN(${HUMIDITY_SQL}) AS umid_min,
+        MAX(${HUMIDITY_SQL}) AS umid_max,
+        AVG(${HUMIDITY_SQL}) AS umid_avg,
         COUNT(*) AS total_leituras
       FROM controle_de_temperatura
       ${whereClause}
@@ -365,14 +386,20 @@ app.get('/api/temperatura/stats', requireAuth, async (req, res) => {
         temp_min: parseFloat(stats[0].temp_min),
         temp_max: parseFloat(stats[0].temp_max),
         temp_avg: parseFloat(stats[0].temp_avg),
+        umid_min: normalizeHumidity(stats[0].umid_min),
+        umid_max: normalizeHumidity(stats[0].umid_max),
+        umid_avg: normalizeHumidity(stats[0].umid_avg),
       },
       por_sala: roomStats.map(r => ({
         ...r,
         temp_min: parseFloat(r.temp_min),
         temp_max: parseFloat(r.temp_max),
         temp_avg: parseFloat(r.temp_avg),
+        umid_min: normalizeHumidity(r.umid_min),
+        umid_max: normalizeHumidity(r.umid_max),
+        umid_avg: normalizeHumidity(r.umid_avg),
       })),
-      limites: LIMITS,
+      limites: limits,
     });
   } catch (err) {
     console.error('Error fetching stats:', err);
@@ -385,11 +412,62 @@ app.get('/api/temperatura/alertas', requireAuth, async (req, res) => {
   try {
     const { inicio, fim, centro_custo, limit: queryLimit } = req.query;
 
+    const limits = await getLimitsForSector(centro_custo);
+    const requestedLimit = parseInt(queryLimit) || 100;
+
+    if (!centro_custo && limits.modo === 'multissetor') {
+      let sql = `
+        SELECT *
+        FROM controle_de_temperatura
+        WHERE codigo_sala IS NOT NULL AND online = 'Sim'
+      `;
+      const params = [];
+
+      if (inicio) { sql += ' AND criado_em >= ?'; params.push(inicio); }
+      if (fim) { sql += ' AND criado_em <= ?'; params.push(fim); }
+
+      sql += ' ORDER BY criado_em DESC LIMIT ?';
+      params.push(Math.max(requestedLimit * 20, 500));
+
+      const [candidateRows] = await pool.query(sql, params);
+      const normalizedRows = await Promise.all(candidateRows.map(async (row) => {
+        const rowLimits = await getLimitsForSector(row.centro_custo);
+        const normalized = normalizeTemperatureReading(row);
+        const alertaTemp = normalized.temperatura_c < rowLimits.temp.min
+          ? 'temp_baixa'
+          : normalized.temperatura_c > rowLimits.temp.max
+            ? 'temp_alta'
+            : null;
+        const alertaUmid = normalized.umidade_pct < rowLimits.umid.min
+          ? 'umid_baixa'
+          : normalized.umidade_pct > rowLimits.umid.max
+            ? 'umid_alta'
+            : null;
+
+        return {
+          ...normalized,
+          alerta_temp: alertaTemp,
+          alerta_umid: alertaUmid,
+          limites: rowLimits,
+        };
+      }));
+
+      const alertRows = normalizedRows.filter(row => row.alerta_temp || row.alerta_umid);
+
+      return res.json({
+        alertas: alertRows.slice(0, requestedLimit),
+        contagem: {
+          alertas_temp: alertRows.filter(row => row.alerta_temp).length,
+          alertas_umid: alertRows.filter(row => row.alerta_umid).length,
+        },
+      });
+    }
+
     let whereClause = `
       WHERE codigo_sala IS NOT NULL AND online = 'Sim'
       AND (
-        temperatura_c < ${LIMITS.temp.min} OR temperatura_c > ${LIMITS.temp.max}
-        OR umidade_pct < ${LIMITS.umid.min} OR umidade_pct > ${LIMITS.umid.max}
+        temperatura_c < ${limits.temp.min} OR temperatura_c > ${limits.temp.max}
+        OR ${HUMIDITY_SQL} < ${limits.umid.min} OR ${HUMIDITY_SQL} > ${limits.umid.max}
       )
     `;
     const params = [];
@@ -401,32 +479,32 @@ app.get('/api/temperatura/alertas', requireAuth, async (req, res) => {
     const [rows] = await pool.query(`
       SELECT *, 
         CASE 
-          WHEN temperatura_c < ${LIMITS.temp.min} THEN 'temp_baixa'
-          WHEN temperatura_c > ${LIMITS.temp.max} THEN 'temp_alta'
+          WHEN temperatura_c < ${limits.temp.min} THEN 'temp_baixa'
+          WHEN temperatura_c > ${limits.temp.max} THEN 'temp_alta'
           ELSE NULL 
         END AS alerta_temp,
         CASE 
-          WHEN umidade_pct < ${LIMITS.umid.min} THEN 'umid_baixa'
-          WHEN umidade_pct > ${LIMITS.umid.max} THEN 'umid_alta'
+          WHEN ${HUMIDITY_SQL} < ${limits.umid.min} THEN 'umid_baixa'
+          WHEN ${HUMIDITY_SQL} > ${limits.umid.max} THEN 'umid_alta'
           ELSE NULL 
         END AS alerta_umid
       FROM controle_de_temperatura
       ${whereClause}
       ORDER BY criado_em DESC
       LIMIT ?
-    `, [...params, parseInt(queryLimit) || 100]);
+    `, [...params, requestedLimit]);
 
     // Count by type
     const [counts] = await pool.query(`
       SELECT
-        SUM(CASE WHEN temperatura_c < ${LIMITS.temp.min} OR temperatura_c > ${LIMITS.temp.max} THEN 1 ELSE 0 END) AS alertas_temp,
-        SUM(CASE WHEN umidade_pct < ${LIMITS.umid.min} OR umidade_pct > ${LIMITS.umid.max} THEN 1 ELSE 0 END) AS alertas_umid
+        SUM(CASE WHEN temperatura_c < ${limits.temp.min} OR temperatura_c > ${limits.temp.max} THEN 1 ELSE 0 END) AS alertas_temp,
+        SUM(CASE WHEN ${HUMIDITY_SQL} < ${limits.umid.min} OR ${HUMIDITY_SQL} > ${limits.umid.max} THEN 1 ELSE 0 END) AS alertas_umid
       FROM controle_de_temperatura
       ${whereClause}
     `, params);
 
     res.json({
-      alertas: rows.map(r => ({ ...r, temperatura_c: parseFloat(r.temperatura_c) })),
+      alertas: rows.map(normalizeTemperatureReading),
       contagem: counts[0],
     });
   } catch (err) {
@@ -441,7 +519,7 @@ app.get('/api/temperatura/salas', requireAuth, async (req, res) => {
     const [rows] = await pool.query(`
       SELECT DISTINCT codigo_sala, centro_custo, sala
       FROM controle_de_temperatura
-      WHERE codigo_sala IS NOT NULL AND online = 'Sim'
+      WHERE codigo_sala IS NOT NULL
       ORDER BY sala
     `);
     res.json(rows);
@@ -685,6 +763,7 @@ app.get('/api/energia/iot/inconformidades', requireAuth, requirePermission('ener
 app.post('/api/relatorio/pdf', requireAuth, async (req, res) => {
   try {
     const { inicio, fim, sala, centro_custo } = req.body;
+    const limits = await getLimitsForSector(centro_custo);
 
     // Fetch data
     let whereClause = "WHERE codigo_sala IS NOT NULL AND online = 'Sim'";
@@ -701,10 +780,10 @@ app.post('/api/relatorio/pdf', requireAuth, async (req, res) => {
     const [stats] = await pool.query(`
       SELECT
         MIN(temperatura_c) AS temp_min, MAX(temperatura_c) AS temp_max, AVG(temperatura_c) AS temp_avg,
-        MIN(umidade_pct) AS umid_min, MAX(umidade_pct) AS umid_max, AVG(umidade_pct) AS umid_avg,
+        MIN(${HUMIDITY_SQL}) AS umid_min, MAX(${HUMIDITY_SQL}) AS umid_max, AVG(${HUMIDITY_SQL}) AS umid_avg,
         COUNT(*) AS total,
-        SUM(CASE WHEN temperatura_c < ${LIMITS.temp.min} OR temperatura_c > ${LIMITS.temp.max} THEN 1 ELSE 0 END) AS alertas_temp,
-        SUM(CASE WHEN umidade_pct < ${LIMITS.umid.min} OR umidade_pct > ${LIMITS.umid.max} THEN 1 ELSE 0 END) AS alertas_umid
+        SUM(CASE WHEN temperatura_c < ${limits.temp.min} OR temperatura_c > ${limits.temp.max} THEN 1 ELSE 0 END) AS alertas_temp,
+        SUM(CASE WHEN ${HUMIDITY_SQL} < ${limits.umid.min} OR ${HUMIDITY_SQL} > ${limits.umid.max} THEN 1 ELSE 0 END) AS alertas_umid
       FROM controle_de_temperatura ${whereClause}
     `, params);
 
@@ -770,8 +849,8 @@ app.post('/api/relatorio/pdf', requireAuth, async (req, res) => {
 
     const summaryData = [
       ['Métrica', 'Mínimo', 'Máximo', 'Média', 'Limite Min', 'Limite Máx'],
-      ['Temperatura (°C)', parseFloat(stats[0].temp_min).toFixed(1), parseFloat(stats[0].temp_max).toFixed(1), parseFloat(stats[0].temp_avg).toFixed(1), String(LIMITS.temp.min), String(LIMITS.temp.max)],
-      ['Umidade (%)', String(stats[0].umid_min), String(stats[0].umid_max), parseFloat(stats[0].umid_avg).toFixed(1), String(LIMITS.umid.min), String(LIMITS.umid.max)],
+      ['Temperatura (°C)', parseFloat(stats[0].temp_min).toFixed(1), parseFloat(stats[0].temp_max).toFixed(1), parseFloat(stats[0].temp_avg).toFixed(1), String(limits.temp.min), String(limits.temp.max)],
+      ['Umidade (%)', String(normalizeHumidity(stats[0].umid_min)), String(normalizeHumidity(stats[0].umid_max)), normalizeHumidity(stats[0].umid_avg).toFixed(1), String(limits.umid.min), String(limits.umid.max)],
     ];
 
     const colWidths = [110, 70, 70, 70, 75, 75];
@@ -831,15 +910,15 @@ app.post('/api/relatorio/pdf', requireAuth, async (req, res) => {
         r.data_hora || '',
         r.sala || '',
         parseFloat(r.temperatura_c).toFixed(1),
-        String(r.umidade_pct || ''),
+        String(normalizeHumidity(r.umidade_pct) || ''),
         r.bateria || '',
         r.online || '',
       ];
 
       xPos = 50;
       for (let j = 0; j < cellData.length; j++) {
-        const isAlert = (j === 2 && (parseFloat(cellData[j]) < LIMITS.temp.min || parseFloat(cellData[j]) > LIMITS.temp.max))
-          || (j === 3 && (parseInt(cellData[j]) < LIMITS.umid.min || parseInt(cellData[j]) > LIMITS.umid.max));
+        const isAlert = (j === 2 && (parseFloat(cellData[j]) < limits.temp.min || parseFloat(cellData[j]) > limits.temp.max))
+          || (j === 3 && (parseInt(cellData[j]) < limits.umid.min || parseInt(cellData[j]) > limits.umid.max));
 
         doc.fontSize(7)
           .fill(isAlert ? '#E74C3C' : darkBlue)
@@ -967,6 +1046,160 @@ function normalizeEnergyStats(stats) {
     desequilibrio_avg: parseNullableNumber(stats.desequilibrio_avg),
     desequilibrio_max: parseNullableNumber(stats.desequilibrio_max),
   };
+}
+
+function normalizeHumidity(value) {
+  const humidity = parseNullableNumber(value);
+  if (!Number.isFinite(humidity)) return null;
+  if (humidity > 100 && humidity <= 1000) return roundNumber(humidity / 10, 1);
+  return roundNumber(humidity, 1);
+}
+
+function normalizeTemperatureReading(row) {
+  return {
+    ...row,
+    temperatura_c: parseFloat(row.temperatura_c),
+    umidade_pct: normalizeHumidity(row.umidade_pct),
+  };
+}
+
+async function getLimitsForSector(sector) {
+  const sectorKey = normalizePermission(sector || '');
+  if (!LIMITS_CSV_URL) return { ...LIMITS };
+
+  const bySector = await loadSectorLimits();
+  if (!sectorKey) return getAggregateLimits(bySector);
+  return bySector.get(sectorKey) || bySector.get('padrao') || getAggregateLimits(bySector);
+}
+
+function getAggregateLimits(bySector) {
+  const limits = [...bySector.values()];
+  if (!limits.length) return { ...LIMITS };
+
+  const uniqueTargets = (items, key) => [...new Set(items.map(item => item[key].target).filter(Number.isFinite))];
+  const tempTargets = uniqueTargets(limits, 'temp');
+  const humidityTargets = uniqueTargets(limits, 'umid');
+  const norms = [...new Set(limits.map(item => item.norma).filter(Boolean))];
+
+  return {
+    temp: {
+      min: Math.min(...limits.map(item => item.temp.min)),
+      max: Math.max(...limits.map(item => item.temp.max)),
+      target: tempTargets.length === 1 ? tempTargets[0] : LIMITS.temp.target,
+    },
+    umid: {
+      min: Math.min(...limits.map(item => item.umid.min)),
+      max: Math.max(...limits.map(item => item.umid.max)),
+      target: humidityTargets.length === 1 ? humidityTargets[0] : LIMITS.umid.target,
+    },
+    setor: 'TODOS',
+    modo: 'multissetor',
+    setores: limits.map(item => item.setor),
+    norma: norms.length === 1 ? norms[0] : 'Regras por setor',
+    descricao: `${limits.length} salas com metas individuais`,
+  };
+}
+
+async function loadSectorLimits() {
+  if (Date.now() - limitsCache.loadedAt < LIMITS_CACHE_MS) {
+    return limitsCache.bySector;
+  }
+
+  try {
+    const response = await fetch(LIMITS_CSV_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const rows = parseCsv(await response.text());
+    const bySector = new Map();
+
+    for (const row of rows) {
+      const sector = rowValue(row, 'centro_custo', 'setor', 'centro_de_custo');
+      const active = normalizePermission(rowValue(row, 'ativo', 'status') || 'sim');
+      if (!sector || ['nao', 'não', 'inativo', 'false', '0'].includes(active)) continue;
+
+      bySector.set(normalizePermission(sector), {
+        temp: {
+          min: parseConfiguredNumber(rowValue(row, 'temperatura_minima_c', 'temperatura_minimac', 'temperatura_minima', 'temp_min'), LIMITS.temp.min),
+          max: parseConfiguredNumber(rowValue(row, 'temperatura_maxima_c', 'temperatura_maximac', 'temperatura_maxima', 'temp_max'), LIMITS.temp.max),
+          target: parseConfiguredNumber(rowValue(row, 'temperatura_alvo_c', 'temperatura_alvoc', 'temperatura_alvo', 'temp_alvo'), LIMITS.temp.target),
+        },
+        umid: {
+          min: parseConfiguredNumber(rowValue(row, 'umidade_minima_pct', 'umidade_minima', 'umid_min'), LIMITS.umid.min),
+          max: parseConfiguredNumber(rowValue(row, 'umidade_maxima_pct', 'umidade_maxima', 'umid_max'), LIMITS.umid.max),
+          target: parseConfiguredNumber(rowValue(row, 'umidade_alvo_pct', 'umidade_alvo', 'umid_alvo'), LIMITS.umid.target),
+        },
+        setor: sector,
+        norma: rowValue(row, 'norma', 'referencia_normativa') || LIMITS.norma,
+        descricao: rowValue(row, 'descricao', 'observacao', 'ambiente') || LIMITS.descricao,
+      });
+    }
+
+    limitsCache = { loadedAt: Date.now(), bySector };
+    return bySector;
+  } catch (err) {
+    console.error('Error loading sector limits CSV:', err);
+    limitsCache = { loadedAt: Date.now(), bySector: new Map() };
+    return limitsCache.bySector;
+  }
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let current = [];
+  let value = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      value += '"';
+      i++;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      current.push(value);
+      value = '';
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && next === '\n') i++;
+      current.push(value);
+      if (current.some(cell => cell.trim())) rows.push(current);
+      current = [];
+      value = '';
+    } else {
+      value += char;
+    }
+  }
+
+  current.push(value);
+  if (current.some(cell => cell.trim())) rows.push(current);
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map(normalizeHeader);
+  return rows.slice(1).map(row => Object.fromEntries(headers.map((header, index) => [header, (row[index] || '').trim()])));
+}
+
+function normalizeHeader(value) {
+  return normalizePermission(value)
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .replace(/^temp_/, 'temperatura_')
+    .replace(/^umid_/, 'umidade_');
+}
+
+function rowValue(row, ...keys) {
+  for (const key of keys) {
+    const value = row[normalizeHeader(key)];
+    if (value !== undefined && value !== '') return value;
+  }
+  return '';
+}
+
+function parseConfiguredNumber(value, fallback) {
+  const number = Number(String(value || '').replace(',', '.').replace(/[^\d.-]/g, ''));
+  return Number.isFinite(number) ? number : fallback;
 }
 
 function buildEnergyIotWhere(filters = {}) {

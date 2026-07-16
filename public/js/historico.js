@@ -61,6 +61,8 @@ const Historico = {
           centerSelect.innerHTML += `<option value="${center}">${center}</option>`;
         });
       });
+
+      SearchableSelect?.enhanceAll?.();
     } catch (e) {
       console.error('Error loading rooms:', e);
     }

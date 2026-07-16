@@ -121,7 +121,7 @@ const Relatorio = {
 
       page.drawText('Soluções inteligentes em serviços e manutenção', {
         x: 40,
-        y: height - 85,
+        y: height - 94,
         size: 9,
         font: fontRegular,
         color: rgb(0.9, 0.9, 0.9),
@@ -154,7 +154,7 @@ const Relatorio = {
 
       // ── Report Title & Metadata ─────────────────────────────
       let y = height - 140;
-      page.drawText('RELATÓRIO INSTITUCIONAL DE CONTROLE DE TEMPERATURA', {
+      page.drawText('RELATÓRIO DE CONTROLE DE TEMPERATURA', {
         x: 40,
         y: y,
         size: 13,

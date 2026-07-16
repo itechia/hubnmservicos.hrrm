@@ -35,24 +35,34 @@ const EnergiaHistorico = {
     document.getElementById('btn-energia-hist-filtrar')?.addEventListener('click', () => this.applyFilters());
   },
 
+  formatLocalDateTime(date) {
+    const pad = (value) => String(value).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const MM = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const hh = pad(date.getHours());
+    const mm = pad(date.getMinutes());
+    return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
+  },
+
   setDefaultDates() {
     const now = new Date();
     const past30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const formatLocal = (d) => {
-      const pad = (n) => String(n).padStart(2, '0');
-      const yyyy = d.getFullYear();
-      const MM = pad(d.getMonth() + 1);
-      const dd = pad(d.getDate());
-      const hh = pad(d.getHours());
-      const mm = pad(d.getMinutes());
-      return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
-    };
-
     const inicioEl = document.getElementById('energia-hist-inicio');
     const fimEl = document.getElementById('energia-hist-fim');
-    if (inicioEl && !inicioEl.value) inicioEl.value = formatLocal(past30d);
-    if (fimEl && !fimEl.value) fimEl.value = formatLocal(now);
+    if (inicioEl && !inicioEl.value) inicioEl.value = this.formatLocalDateTime(past30d);
+    if (fimEl && !fimEl.value) fimEl.value = this.formatLocalDateTime(now);
+  },
+
+  setRollingThirtyDayWindow() {
+    const now = new Date();
+    const past30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const inicioEl = document.getElementById('energia-hist-inicio');
+    const fimEl = document.getElementById('energia-hist-fim');
+
+    if (inicioEl) inicioEl.value = this.formatLocalDateTime(past30d);
+    if (fimEl) fimEl.value = this.formatLocalDateTime(now);
   },
 
   getFiltersQuery() {
@@ -71,6 +81,10 @@ const EnergiaHistorico = {
   },
 
   async applyFilters(options = {}) {
+    if (options.rollingWindow || document.body.classList.contains('tv-mode')) {
+      this.setRollingThirtyDayWindow();
+    }
+
     if (!options.silent) {
       App.showLoading('Carregando histórico de energia...', 'Consultando leituras do período selecionado e atualizando gráficos.');
       App.setButtonLoading('btn-energia-hist-filtrar', true, 'Carregando...');

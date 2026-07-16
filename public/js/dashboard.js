@@ -1,6 +1,4 @@
-/* ═══════════════════════════════════════════════
-   DASHBOARD — Visão Geral (Real-Time)
-   ═══════════════════════════════════════════════ */
+/* Dashboard — Visão Geral (Real-Time) */
 
 const Dashboard = {
   chart24h: null,
@@ -13,7 +11,9 @@ const Dashboard = {
 
   async loadLimits() {
     try {
-      const res = await API.get('/api/config/limites');
+      const centroCusto = App.getCentroCustoFilter?.() || '';
+      const suffix = centroCusto ? `?centro_custo=${encodeURIComponent(centroCusto)}` : '';
+      const res = await API.get(`/api/config/limites${suffix}`);
       this.limits = res;
     } catch (e) {
       this.limits = { temp: { min: 15, max: 30, target: 22 }, umid: { min: 40, max: 70, target: 55 } };
@@ -25,6 +25,7 @@ const Dashboard = {
       const centroCusto = App.getCentroCustoFilter?.() || '';
       const centroQuery = centroCusto ? `&centro_custo=${encodeURIComponent(centroCusto)}` : '';
       const centroQueryStart = centroCusto ? `?centro_custo=${encodeURIComponent(centroCusto)}` : '';
+      await this.loadLimits();
       const [current, histData, stats, alertsData] = await Promise.all([
         API.get(`/api/temperatura/atual${centroQueryStart}`),
         API.get(`/api/temperatura/historico?limit=500${centroQuery}`),
@@ -71,16 +72,16 @@ const Dashboard = {
           <span class="unit">°C</span>
         `)}
         <div class="condition-label">Temperatura Média</div>
-        <div class="condition-sub">Alvo: ${this.limits.temp.target}°C | Faixa: ${this.limits.temp.min}–${this.limits.temp.max}°C</div>
+        <div class="condition-sub">Alvo: ${this.formatTarget(this.limits.temp.target, '°C')} | Faixa: ${this.limits.temp.min}–${this.limits.temp.max}°C</div>
       </div>
 
       <div class="condition-item">
         ${this.createGaugeSVG(umidPct, this.getStatusColor(avgUmid, this.limits.umid), `
-          <span class="big-number">${avgUmid.toFixed(0)}</span>
+          <span class="big-number">${this.formatHumidity(avgUmid)}</span>
           <span class="unit">%</span>
         `)}
         <div class="condition-label">Umidade Média</div>
-        <div class="condition-sub">Alvo: ${this.limits.umid.target}% | Faixa: ${this.limits.umid.min}–${this.limits.umid.max}%</div>
+        <div class="condition-sub">Alvo: ${this.formatTarget(this.limits.umid.target, '%')} | Faixa: ${this.limits.umid.min}–${this.limits.umid.max}%</div>
       </div>
 
       <div class="condition-item">
@@ -134,14 +135,14 @@ const Dashboard = {
         <div>
           <div class="condition-label">Temperatura Média</div>
           <div class="readout-value temp">${avgTemp.toFixed(1)}<span>°C</span></div>
-          <div class="condition-sub">Alvo: ${this.limits.temp.target} °C</div>
+          <div class="condition-sub">Alvo: ${this.formatTarget(this.limits.temp.target, '°C')}</div>
           <div class="condition-sub">Faixa: ${this.limits.temp.min} - ${this.limits.temp.max} °C</div>
         </div>
       </div>
 
       <div class="condition-humidity-center">
         ${this.createGaugeSVG(umidPct, this.getStatusColor(avgUmid, this.limits.umid), `
-          <span class="big-number">${avgUmid.toFixed(0)}</span>
+          <span class="big-number">${this.formatHumidity(avgUmid)}</span>
           <span class="unit">%</span>
         `)}
         <div class="condition-label">Umidade Média</div>
@@ -156,7 +157,7 @@ const Dashboard = {
           <div class="readout-value sensors">${onlineCount}<span>/${current.length}</span></div>
           <div class="condition-sub">Online: ${onlineCount}</div>
           <div class="condition-sub">Offline: ${current.length - onlineCount}</div>
-          <div class="condition-sub">Médias: ${avgTemp.toFixed(1)} °C · ${avgUmid.toFixed(0)}%</div>
+          <div class="condition-sub">Médias: ${avgTemp.toFixed(1)} °C · ${this.formatHumidity(avgUmid)}%</div>
         </div>
       </div>
     `;
@@ -169,7 +170,7 @@ const Dashboard = {
 
       indicators.innerHTML = `
         <div class="indicator-item">
-          <span class="indicator-icon">☻</span>
+          <span class="indicator-icon">&#9787;</span>
           <span class="indicator-label">Conforto</span>
           <span class="indicator-value ${tempStatus.class}">${tempStatus.label}</span>
         </div>
@@ -201,7 +202,7 @@ const Dashboard = {
       <div class="setpoint-item">
         <div class="setpoint-header">
           <span class="setpoint-label">Temperatura Alvo</span>
-          <span class="setpoint-value">${this.limits.temp.target}°C</span>
+          <span class="setpoint-value">${this.formatTarget(this.limits.temp.target, '°C')}</span>
         </div>
         <div class="setpoint-range">
           <span>${this.limits.temp.min}°C</span>
@@ -216,7 +217,7 @@ const Dashboard = {
       <div class="setpoint-item">
         <div class="setpoint-header">
           <span class="setpoint-label">Umidade Alvo</span>
-          <span class="setpoint-value">${this.limits.umid.target}%</span>
+          <span class="setpoint-value">${this.formatTarget(this.limits.umid.target, '%')}</span>
         </div>
         <div class="setpoint-range">
           <span>${this.limits.umid.min}%</span>
@@ -231,10 +232,10 @@ const Dashboard = {
       <div class="setpoint-item" style="background: rgba(0,139,198,0.05); border-color: rgba(0,139,198,0.2);">
         <div class="setpoint-header">
           <span class="setpoint-label">Norma</span>
-          <span class="setpoint-value" style="font-size:var(--fs-sm);color:var(--nm-azul-profundo);">RDC50 / ANVISA</span>
+          <span class="setpoint-value" style="font-size:var(--fs-sm);color:var(--nm-azul-profundo);">${this.limits.norma || 'RDC50 / ANVISA'}</span>
         </div>
         <div style="font-size:var(--fs-xs);color:var(--text-muted);">
-          Área de Armazenamento Hospitalar
+          ${this.getLimitsDescription(current)}
         </div>
       </div>
     `;
@@ -253,7 +254,7 @@ const Dashboard = {
       <div class="setpoint-item setpoint-control">
         <div class="setpoint-header">
           <span class="setpoint-label">Temperatura Alvo</span>
-          <span class="setpoint-value temp">${this.limits.temp.target.toFixed ? this.limits.temp.target.toFixed(1) : this.limits.temp.target}<small> °C</small></span>
+          <span class="setpoint-value temp">${this.formatTarget(this.limits.temp.target, '°C')}</span>
         </div>
         <div class="setpoint-range">
           <span>${this.limits.temp.min} °C</span>
@@ -268,7 +269,7 @@ const Dashboard = {
       <div class="setpoint-item setpoint-control">
         <div class="setpoint-header">
           <span class="setpoint-label">Umidade Alvo</span>
-          <span class="setpoint-value umid">${this.limits.umid.target}<small> %</small></span>
+          <span class="setpoint-value umid">${this.formatTarget(this.limits.umid.target, '%')}</span>
         </div>
         <div class="setpoint-range">
           <span>${this.limits.umid.min}%</span>
@@ -283,9 +284,9 @@ const Dashboard = {
       <div class="setpoint-item standard-note">
         <div class="setpoint-header">
           <span class="setpoint-label">Norma</span>
-          <span class="setpoint-badge">RDC50 / ANVISA</span>
+          <span class="setpoint-badge">${this.limits.norma || 'RDC50 / ANVISA'}</span>
         </div>
-        <div class="condition-sub">Área de Armazenamento Hospitalar</div>
+        <div class="condition-sub">${this.getLimitsDescription(current)}</div>
       </div>
     `;
   },
@@ -328,13 +329,13 @@ const Dashboard = {
               <div class="room-metric-label">Temperatura</div>
             </div>
             <div class="room-metric">
-              <div class="room-metric-value umid">${room.umidade_pct}%</div>
+              <div class="room-metric-value umid">${this.formatHumidity(room.umidade_pct)}%</div>
               <div class="room-metric-label">Umidade</div>
             </div>
           </div>
           <div class="room-meta">
-            <span>🔋 ${room.bateria || '--'}</span>
-            <span>📅 ${room.data_hora || '--'}</span>
+            <span>Bateria: ${room.bateria || '--'}</span>
+            <span>${room.data_hora || '--'}</span>
           </div>
         </div>
       `;
@@ -345,26 +346,24 @@ const Dashboard = {
     const container = document.getElementById('rooms-section');
     if (!container) return;
 
-    const sortedRooms = [...rooms].sort((a, b) => {
-      const getScore = (room) => {
-        if (room.temp_status === 'critico' || room.umid_status === 'critico') return 2;
-        if (room.temp_status === 'atencao' || room.umid_status === 'atencao') return 1;
-        return 0;
-      };
-      return getScore(b) - getScore(a);
-    });
+    const sortedRooms = [...rooms].sort((a, b) => this.getRoomPriority(b) - this.getRoomPriority(a));
 
     container.innerHTML = `
       <div class="equipment-panel-title">Equipamentos Monitorados</div>
       ${sortedRooms.map(room => {
-        const overallStatus = room.temp_status === 'critico' || room.umid_status === 'critico'
-          ? 'critico' : room.temp_status === 'atencao' || room.umid_status === 'atencao'
-            ? 'atencao' : 'normal';
+        const overallStatus = room.online !== 'Sim'
+          ? 'critico'
+          : room.temp_status === 'critico' || room.umid_status === 'critico'
+            ? 'critico' : room.temp_status === 'atencao' || room.umid_status === 'atencao'
+              ? 'atencao' : 'normal';
 
         return `
           <div class="room-card equipment-row ${overallStatus}">
-            <div class="equipment-icon">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="8" rx="2"/><path d="M7 17h.01M12 17h.01M17 17h.01"/><path d="M8 13v6M16 13v6"/></svg>
+            <div class="equipment-status-side">
+              <div class="equipment-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="8" rx="2"/><path d="M7 17h.01M12 17h.01M17 17h.01"/><path d="M8 13v6M16 13v6"/></svg>
+              </div>
+              <div class="room-online status-pill ${room.online === 'Sim' ? 'on' : 'off'}">${room.online === 'Sim' ? 'Ligado' : 'Offline'}</div>
             </div>
             <div class="equipment-body">
               <div class="room-header">
@@ -372,11 +371,10 @@ const Dashboard = {
                   <div class="room-name">${room.sala || 'Sala'}</div>
                   <div class="room-sector">${room.centro_custo || ''} · Cód: ${room.codigo_sala}</div>
                 </div>
-                <div class="room-online status-pill ${room.online === 'Sim' ? 'on' : 'off'}">${room.online === 'Sim' ? 'Ligado' : 'Offline'}</div>
               </div>
               <div class="equipment-meta">
                 <span>Temp. saída: ${room.temperatura_c.toFixed(1)} °C</span>
-                <span>Umid.: ${room.umidade_pct}%</span>
+                <span>Umid.: ${this.formatHumidity(room.umidade_pct)}%</span>
                 <span>Bateria: ${room.bateria || '--'}</span>
               </div>
             </div>
@@ -425,11 +423,11 @@ const Dashboard = {
       </div>
       <div class="chart-stat">
         <div class="chart-stat-label">Umid. Min / Max</div>
-        <div class="chart-stat-value">${g.umid_min} / ${g.umid_max} %</div>
+        <div class="chart-stat-value">${this.formatHumidity(g.umid_min)} / ${this.formatHumidity(g.umid_max)} %</div>
       </div>
       <div class="chart-stat">
         <div class="chart-stat-label">Média Geral</div>
-        <div class="chart-stat-value">${g.temp_avg.toFixed(1)} °C | ${parseFloat(g.umid_avg).toFixed(0)}%</div>
+        <div class="chart-stat-value">${g.temp_avg.toFixed(1)} °C | ${this.formatHumidity(g.umid_avg)}%</div>
       </div>
       <div class="chart-stat">
         <div class="chart-stat-label">Total Leituras</div>
@@ -446,7 +444,7 @@ const Dashboard = {
     if (alerts.length === 0) {
       container.innerHTML = `
         <div class="alert-bar-item ok">
-          <span class="alert-bar-icon">✅</span>
+          <span class="alert-bar-icon">OK</span>
           <span class="alert-bar-text">Todos os parâmetros normais</span>
           <span class="alert-bar-time">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
@@ -458,13 +456,13 @@ const Dashboard = {
       const isTemp = a.alerta_temp;
       const isUmid = a.alerta_umid;
       const type = (isTemp === 'temp_alta' || isTemp === 'temp_baixa') ? 'critical' : 'warning';
-      let icon = '⚠️';
+      let icon = '!';
       let text = '';
 
-      if (isTemp === 'temp_alta') { icon = '🌡️'; text = `Temp. ALTA: ${a.temperatura_c.toFixed(1)}°C — ${a.sala}`; }
-      else if (isTemp === 'temp_baixa') { icon = '❄️'; text = `Temp. BAIXA: ${a.temperatura_c.toFixed(1)}°C — ${a.sala}`; }
-      if (isUmid === 'umid_alta') { icon = '💧'; text = `Umid. ALTA: ${a.umidade_pct}% — ${a.sala}`; }
-      else if (isUmid === 'umid_baixa') { icon = '🏜️'; text = `Umid. BAIXA: ${a.umidade_pct}% — ${a.sala}`; }
+      if (isTemp === 'temp_alta') { icon = 'T'; text = `Temp. ALTA: ${a.temperatura_c.toFixed(1)}°C — ${a.sala}`; }
+      else if (isTemp === 'temp_baixa') { icon = 'T'; text = `Temp. BAIXA: ${a.temperatura_c.toFixed(1)}°C — ${a.sala}`; }
+      if (isUmid === 'umid_alta') { icon = 'U'; text = `Umid. ALTA: ${this.formatHumidity(a.umidade_pct)}% — ${a.sala}`; }
+      else if (isUmid === 'umid_baixa') { icon = 'U'; text = `Umid. BAIXA: ${this.formatHumidity(a.umidade_pct)}% — ${a.sala}`; }
 
       return `
         <div class="alert-bar-item ${type}">
@@ -482,12 +480,12 @@ const Dashboard = {
     const onlineCount = current.filter(r => r.online === 'Sim').length;
 
     document.getElementById('summary-temp').textContent = `${avgTemp.toFixed(1)}°C`;
-    document.getElementById('summary-umid').textContent = `${avgUmid.toFixed(0)}%`;
+    document.getElementById('summary-umid').textContent = `${this.formatHumidity(avgUmid)}%`;
     document.getElementById('summary-sensors').textContent = `${onlineCount}/${current.length}`;
 
     const statusEl = document.getElementById('summary-status');
     const allNormal = current.every(r => r.temp_status === 'normal' && r.umid_status === 'normal');
-    statusEl.textContent = allNormal ? '✅ Normal' : '⚠️ Atenção';
+    statusEl.textContent = allNormal ? 'Normal' : 'Atenção';
     statusEl.style.color = allNormal ? 'var(--nm-verde)' : 'var(--nm-amarelo)';
   },
 
@@ -500,7 +498,7 @@ const Dashboard = {
     }
   },
 
-  // ── Helpers ─────────────────────────────
+  // Helpers
   createGaugeSVG(percent, color, valueHTML) {
     const r = 48;
     const c = 2 * Math.PI * r;
@@ -524,6 +522,51 @@ const Dashboard = {
 
   valueToPercent(val, min, max) {
     return ((val - min) / (max - min)) * 100;
+  },
+
+  formatHumidity(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '--';
+    return number.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  },
+
+  formatTarget(value, unit = '') {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 'Por setor';
+    const formatted = number.toLocaleString('pt-BR', { minimumFractionDigits: unit.includes('°') ? 1 : 0, maximumFractionDigits: 1 });
+    return `${formatted}${unit}`;
+  },
+
+  getLimitsDescription(current = []) {
+    if (this.limits?.modo === 'multissetor') {
+      const activeRooms = current.filter(reading => reading.online === 'Sim').length;
+      return `${activeRooms} salas com sensores ativos e metas individuais`;
+    }
+
+    return this.limits?.descricao || 'Área monitorada';
+  },
+
+  getRoomPriority(room) {
+    if (room.online !== 'Sim') return 5000;
+
+    const statusScore = room.temp_status === 'critico' || room.umid_status === 'critico'
+      ? 2000
+      : room.temp_status === 'atencao' || room.umid_status === 'atencao'
+        ? 1000
+        : 0;
+
+    const tempDeviation = this.getLimitDeviation(room.temperatura_c, this.limits.temp);
+    const humidityDeviation = this.getLimitDeviation(room.umidade_pct, this.limits.umid);
+
+    return statusScore + Math.max(tempDeviation, humidityDeviation);
+  },
+
+  getLimitDeviation(value, limits) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    if (number < limits.min) return limits.min - number;
+    if (number > limits.max) return number - limits.max;
+    return 0;
   },
 
   getStatusColor(val, limits) {

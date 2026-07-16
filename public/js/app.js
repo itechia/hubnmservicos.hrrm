@@ -219,7 +219,8 @@ const App = {
     this.lastRefresh = {
       temperature: Date.now(),
       energySolar: Date.now(),
-      energyRede: Date.now()
+      energyRede: Date.now(),
+      energyHistory: Date.now()
     };
 
     // Auto-refresh checker (runs every 5 seconds)
@@ -238,12 +239,17 @@ const App = {
           this.lastRefresh.energyRede = now;
           await Energia.refreshRede({ filtered: false, silent: true });
         }
-    } else if (this.currentPage === 'energia-solar') {
-      // Solar energy refresh: once a day (every 24 hours)
-      if (now - this.lastRefresh.energySolar >= 24 * 60 * 60 * 1000) {
-        this.lastRefresh.energySolar = now;
-        await Energia.refreshGeracao({ silent: true });
-      }
+      } else if (this.currentPage === 'historico-energia') {
+        if (now - this.lastRefresh.energyHistory >= 30 * 60 * 1000) {
+          this.lastRefresh.energyHistory = now;
+          await EnergiaHistorico.applyFilters({ silent: true, rollingWindow: true });
+        }
+      } else if (this.currentPage === 'energia-solar') {
+        // Solar energy refresh: once a day (every 24 hours)
+        if (now - this.lastRefresh.energySolar >= 24 * 60 * 60 * 1000) {
+          this.lastRefresh.energySolar = now;
+          await Energia.refreshGeracao({ silent: true });
+        }
       }
     }, 5000);
   },
@@ -316,6 +322,7 @@ const App = {
             otherSelect.value = value;
           }
         });
+        SearchableSelect?.syncAll?.();
         refreshCurrentPage();
       });
     });
@@ -420,8 +427,8 @@ const App = {
       if (this.lastRefresh) this.lastRefresh.energyRede = Date.now();
       Energia.refreshRede({ filtered: true, silent: true });
     } else if (page === 'historico-energia') {
-      if (this.lastRefresh) this.lastRefresh.energyRede = Date.now();
-      EnergiaHistorico.applyFilters({ silent: true });
+      if (this.lastRefresh) this.lastRefresh.energyHistory = Date.now();
+      EnergiaHistorico.applyFilters({ silent: true, rollingWindow: document.body.classList.contains('tv-mode') });
     }
 
     // Close sidebar on mobile
