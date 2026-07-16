@@ -82,9 +82,9 @@ ENERGY_LIMITS.faseFase = {
 const HUMIDITY_SQL = 'CASE WHEN umidade_pct > 100 AND umidade_pct <= 1000 THEN umidade_pct / 10 ELSE umidade_pct END';
 
 // ── Stateless Token Authentication (JWT-like using native crypto) ──
-const JWT_SECRET = env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+const JWT_SECRET = env.JWT_SECRET || 'default_secret_for_hrrm_dashboards_2026';
 if (!env.JWT_SECRET) {
-  console.warn('JWT_SECRET ausente. Usando segredo temporário; sessões expiram ao reiniciar o servidor.');
+  console.warn('JWT_SECRET ausente. Usando fallback estável para compatibilidade; configure JWT_SECRET na Vercel para maior segurança.');
 }
 
 function generateToken(user) {
