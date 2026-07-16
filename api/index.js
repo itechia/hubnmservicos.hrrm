@@ -59,6 +59,8 @@ const LIMITS = {
 const LIMITS_CSV_URL = env.LIMITES_SETORES_CSV_URL || env.SECTORS_LIMITS_CSV_URL || '';
 const LIMITS_CACHE_MS = 5 * 60 * 1000;
 let limitsCache = { loadedAt: 0, bySector: new Map() };
+const LOGIN_CSV_CACHE_MS = 60 * 1000;
+let loginCsvCache = { loadedAt: 0, users: [] };
 
 const ENERGY_LIMITS = {
   faseNeutro: {
@@ -80,7 +82,10 @@ ENERGY_LIMITS.faseFase = {
 const HUMIDITY_SQL = 'CASE WHEN umidade_pct > 100 AND umidade_pct <= 1000 THEN umidade_pct / 10 ELSE umidade_pct END';
 
 // ── Stateless Token Authentication (JWT-like using native crypto) ──
-const JWT_SECRET = env.JWT_SECRET || 'default_secret_for_hrrm_dashboards_2026';
+const JWT_SECRET = env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+if (!env.JWT_SECRET) {
+  console.warn('JWT_SECRET ausente. Usando segredo temporário; sessões expiram ao reiniciar o servidor.');
+}
 
 function generateToken(user) {
   const payload = JSON.stringify({
@@ -99,7 +104,7 @@ function verifyToken(token) {
     if (!payloadB64 || !signature) return null;
     
     const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(payloadB64).digest('base64url');
-    if (signature !== expectedSignature) return null;
+    if (!safeEqual(signature, expectedSignature)) return null;
     
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
     if (payload.exp < Date.now()) return null; // Expired
@@ -149,19 +154,96 @@ function requirePermission(...allowedPermissions) {
   };
 }
 
+const allowedCorsOrigins = (env.CORS_ORIGIN || env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedCorsOrigins.length === 0 || allowedCorsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origem não permitida pelo CORS.'));
+  },
+};
+
+function securityHeaders(req, res, next) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  next();
+}
+
+const rateLimitStore = new Map();
+
+function createRateLimiter({ windowMs, max }) {
+  return (req, res, next) => {
+    const key = `${windowMs}:${max}:${req.ip}:${req.method}:${req.path}`;
+    const now = Date.now();
+    const record = rateLimitStore.get(key);
+
+    if (!record || record.resetAt <= now) {
+      rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+
+    record.count += 1;
+    if (record.count > max) {
+      res.setHeader('Retry-After', Math.ceil((record.resetAt - now) / 1000));
+      return res.status(429).json({ error: 'Muitas requisições. Aguarde alguns segundos e tente novamente.' });
+    }
+
+    return next();
+  };
+}
+
+function safeEqual(a, b) {
+  const aBuffer = Buffer.from(String(a));
+  const bBuffer = Buffer.from(String(b));
+  return aBuffer.length === bBuffer.length && crypto.timingSafeEqual(aBuffer, bBuffer);
+}
+
+function parseLimit(value, fallback = 100, max = 5000) {
+  const limit = Number.parseInt(value, 10);
+  if (!Number.isFinite(limit) || limit <= 0) return fallback;
+  return Math.min(limit, max);
+}
+
 // ── Express App ─────────────────────────────────────────────────
 const app = express();
-app.use(cors());
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(securityHeaders);
+app.use(cors(corsOptions));
+app.use('/api/', createRateLimiter({ windowMs: 60 * 1000, max: 240 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  etag: true,
+  maxAge: '1h',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 // PDF Download Bridge (converts POSTed base64 bytes to a downloadable PDF response)
-app.post('/api/relatorio/download', (req, res) => {
+app.post('/api/relatorio/download', requireAuth, (req, res) => {
   try {
     const { pdfBase64, filename } = req.body;
     if (!pdfBase64) return res.status(400).send('Dados do PDF ausentes.');
+    if (typeof pdfBase64 !== 'string' || pdfBase64.length > 10 * 1024 * 1024) {
+      return res.status(413).send('PDF inválido ou grande demais.');
+    }
+
     const buffer = Buffer.from(pdfBase64, 'base64');
+    if (!buffer.length || buffer.subarray(0, 4).toString() !== '%PDF') {
+      return res.status(400).send('Arquivo PDF inválido.');
+    }
     
     // Sanitize the filename to avoid headers formatting errors
     const safeFilename = (filename || 'relatorio').replace(/[^a-zA-Z0-9_\-]/g, '_');
@@ -179,42 +261,24 @@ app.post('/api/relatorio/download', (req, res) => {
 // AUTH ENDPOINTS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', createRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 }), async (req, res) => {
   try {
     const { login, senha } = req.body;
     if (!login || !senha) {
       return res.status(400).json({ error: 'Login e senha são obrigatórios.' });
     }
 
-    // Fetch credentials from Google Sheets CSV
-    const csvUrl = env.SHEETS_CSV_URL;
-    const response = await fetch(csvUrl);
-    const csvText = await response.text();
-
-    // Parse CSV (skip header)
-    const lines = csvText.trim().split('\n').slice(1);
-    let foundUser = null;
-
-    for (const line of lines) {
-      const parts = line.split(',').map(p => p.trim().replace(/\r/g, ''));
-      if (parts.length >= 3) {
-        const csvLogin = parts[0];
-        const csvSenha = parts[1];
-        const csvPermissao = parts.slice(2).join(', ').replace(/^"|"$/g, '').trim();
-        if (csvLogin === login && csvSenha === senha) {
-          foundUser = { login: csvLogin, permissao: csvPermissao };
-          break;
-        }
-      }
-    }
+    const users = await loadLoginUsers();
+    const foundUser = users.find(user => user.login === login && user.senha === senha);
 
     if (!foundUser) {
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
-    const token = generateToken(foundUser);
+    const safeUser = { login: foundUser.login, permissao: foundUser.permissao };
+    const token = generateToken(safeUser);
 
-    res.json({ token, user: foundUser });
+    res.json({ token, user: safeUser });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Erro interno no servidor.' });
@@ -326,7 +390,7 @@ app.get('/api/temperatura/historico', requireAuth, async (req, res) => {
 
     if (queryLimit) {
       sql += ' LIMIT ?';
-      params.push(parseInt(queryLimit));
+      params.push(parseLimit(queryLimit, 500, 5000));
     }
 
     const [rows] = await pool.query(sql, params);
@@ -413,7 +477,7 @@ app.get('/api/temperatura/alertas', requireAuth, async (req, res) => {
     const { inicio, fim, centro_custo, limit: queryLimit } = req.query;
 
     const limits = await getLimitsForSector(centro_custo);
-    const requestedLimit = parseInt(queryLimit) || 100;
+    const requestedLimit = parseLimit(queryLimit, 100, 500);
 
     if (!centro_custo && limits.modo === 'multissetor') {
       let sql = `
@@ -427,7 +491,7 @@ app.get('/api/temperatura/alertas', requireAuth, async (req, res) => {
       if (fim) { sql += ' AND criado_em <= ?'; params.push(fim); }
 
       sql += ' ORDER BY criado_em DESC LIMIT ?';
-      params.push(Math.max(requestedLimit * 20, 500));
+      params.push(Math.min(Math.max(requestedLimit * 20, 500), 5000));
 
       const [candidateRows] = await pool.query(sql, params);
       const normalizedRows = await Promise.all(candidateRows.map(async (row) => {
@@ -567,7 +631,7 @@ app.get('/api/energia/geracao/historico', requireAuth, requirePermission('energi
     if (fim) { sql += ' AND data <= ?'; params.push(fim); }
 
     sql += ' ORDER BY data DESC';
-    if (queryLimit) { sql += ' LIMIT ?'; params.push(parseInt(queryLimit)); }
+    if (queryLimit) { sql += ' LIMIT ?'; params.push(parseLimit(queryLimit, 500, 5000)); }
 
     const [rows] = await pool.query(sql, params);
     res.json(rows.map(row => ({ ...row, energia: parseFloat(row.energia) })));
@@ -672,7 +736,7 @@ app.get('/api/energia/iot/historico', requireAuth, requirePermission('energia_el
 
     if (queryLimit) {
       sql += ' LIMIT ?';
-      params.push(parseInt(queryLimit));
+      params.push(parseLimit(queryLimit, 1000, 10000));
     }
 
     const [rows] = await pool.query(sql, params);
@@ -747,7 +811,7 @@ app.get('/api/energia/iot/inconformidades', requireAuth, requirePermission('ener
       ${whereClause}
       ORDER BY data_hora_registro DESC, id DESC
       LIMIT ?
-    `, [...params, parseInt(queryLimit) || 100]);
+    `, [...params, parseLimit(queryLimit, 100, 500)]);
 
     res.json(rows.map(normalizeEnergyReading));
   } catch (err) {
@@ -1046,6 +1110,28 @@ function normalizeEnergyStats(stats) {
     desequilibrio_avg: parseNullableNumber(stats.desequilibrio_avg),
     desequilibrio_max: parseNullableNumber(stats.desequilibrio_max),
   };
+}
+
+async function loadLoginUsers() {
+  if (Date.now() - loginCsvCache.loadedAt < LOGIN_CSV_CACHE_MS && loginCsvCache.users.length) {
+    return loginCsvCache.users;
+  }
+
+  const response = await fetch(env.SHEETS_CSV_URL);
+  if (!response.ok) throw new Error(`Login CSV HTTP ${response.status}`);
+
+  const rows = parseCsv(await response.text());
+  const users = rows.map((row) => {
+    const values = Object.values(row);
+    return {
+      login: rowValue(row, 'login', 'usuario', 'user') || values[0] || '',
+      senha: rowValue(row, 'senha', 'password') || values[1] || '',
+      permissao: rowValue(row, 'permissao', 'permissão', 'perfil') || values.slice(2).join(', '),
+    };
+  }).filter(user => user.login && user.senha);
+
+  loginCsvCache = { loadedAt: Date.now(), users };
+  return users;
 }
 
 function normalizeHumidity(value) {
