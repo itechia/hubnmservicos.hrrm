@@ -4300,3 +4300,92 @@ body.tv-mode .conditions-indicators {
   }
 }
 
+/* Definitive TV monitor layout: conditions must never overlap chart */
+body.tv-mode #page-visao-geral.active {
+  grid-template-rows: 286px minmax(0, 1fr) 50px !important;
+  gap: 8px !important;
+}
+
+body.tv-mode #card-conditions {
+  height: 286px !important;
+  max-height: 286px !important;
+  min-height: 0 !important;
+  padding: 9px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+body.tv-mode #card-conditions .card-title {
+  flex: 0 0 auto !important;
+  margin-bottom: 8px !important;
+}
+
+body.tv-mode #card-conditions .conditions-grid {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 108px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+body.tv-mode #card-conditions .condition-readout,
+body.tv-mode #card-conditions .condition-humidity-center {
+  min-height: 86px !important;
+  padding: 8px 10px !important;
+}
+
+body.tv-mode #card-conditions .condition-humidity-center .condition-gauge {
+  width: 76px !important;
+  height: 76px !important;
+}
+
+body.tv-mode #card-conditions .conditions-indicators {
+  flex: 0 0 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+  padding-top: 7px !important;
+  overflow: hidden !important;
+}
+
+body.tv-mode #card-conditions .indicator-item {
+  min-height: 30px !important;
+  padding: 4px 8px !important;
+  grid-template-columns: 20px minmax(0, 1fr) !important;
+  align-content: center !important;
+}
+
+body.tv-mode #card-conditions .indicator-icon {
+  font-size: 0.95rem !important;
+}
+
+body.tv-mode #card-conditions .indicator-label {
+  font-size: 0.52rem !important;
+  line-height: 1 !important;
+}
+
+body.tv-mode #card-conditions .indicator-value {
+  font-size: 0.7rem !important;
+  line-height: 1.05 !important;
+}
+
+body.tv-mode #card-chart-24h {
+  grid-area: chart !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin-top: 0 !important;
+  align-self: stretch !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+body.tv-mode #card-conditions {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
